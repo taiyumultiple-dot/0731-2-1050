@@ -116,8 +116,8 @@ interface InteractiveQuestTabProps {
 const GAMES = [
   {
     id: 1,
-    title: '生命讀秒：24小時',
-    description: '如果生命只剩 24 小時，你會怎麼分配？召喚屬於你的生命英雄。',
+    title: '幸福導航：生命地圖啟程',
+    description: '完成四項生命探索任務，蒐集五把幸福鑰匙，開啟幸福之門。',
     emoji: '⏳',
     color: 'bg-[#FFF9F2] border-[#F1E0CE] text-[#C48C46]',
     iconColor: 'text-[#C48C46]',
@@ -611,83 +611,55 @@ export default function InteractiveQuestTab({
   };
 
   // ----------------------------------------------------
-  // GAME STATE 1: 生命讀秒 24 小時
-  // (呼應總說單元:一分鐘蒼蠅的時間壓力 + 幸福路上的自我探索 + 五把鑰匙)
-  // 流程: intro(蒼蠅倒數) → allocate(24小時分配) → dialogue(內心對話) → summon(召喚) → result(英雄卡)
+  // GAME STATE 1: 幸福導航｜生命地圖啟程
+  // 大廳地圖 + 5 個真互動任務關卡(取代先前的截圖demo,這裡全部是真的遊戲邏輯)
+  // 任務1 打破幸福公式 / 任務2 一分鐘蒼蠅挑戰(真倒數) / 任務3 重要與必要 / 任務4 自我探索站 / 任務5(關卡) 幸福之門
   // ----------------------------------------------------
   type LifeKeyId = '哲學思考' | '人學探索' | '終極關懷' | '價值思辨' | '靈性修養';
+  type G1Stage = 'lobby' | 'task1' | 'task2' | 'task3' | 'task4' | 'gate' | 'summon' | 'result';
+  type G1TaskId = 'task1' | 'task2' | 'task3' | 'task4' | 'gate';
 
-  const [g1Stage, setG1Stage] = useState<'intro' | 'allocate' | 'dialogue' | 'summon' | 'result'>('intro');
-  const [g1Chosen, setG1Chosen] = useState<string[]>([]);
-  const [g1DialogueAnswers, setG1DialogueAnswers] = useState<Record<number, number>>({});
-  const [g1DialogueStep, setG1DialogueStep] = useState(0);
+  const [g1Stage, setG1Stage] = useState<G1Stage>('lobby');
+  const [g1Done, setG1Done] = useState<Record<G1TaskId, boolean>>({ task1: false, task2: false, task3: false, task4: false, gate: false });
 
-  interface LifeCard {
-    id: string; title: string; emoji: string; hours: number;
-    necessary: boolean; meaningful: boolean; key: LifeKeyId | null;
-  }
+  // 任務1：打破幸福公式（點選候補詞卡加入你的幸福路徑）
+  const TASK1_POOL = ['健康', '家人', '興趣', '朋友', '自由', '意義', '成長', '幫助他人'];
+  const [g1Path, setG1Path] = useState<string[]>([]);
 
-  const LIFE_CARDS: LifeCard[] = [
-    { id: 'family_meal', title: '陪家人好好吃一頓飯', emoji: '🍚', hours: 2, necessary: false, meaningful: true, key: '終極關懷' },
-    { id: 'reconcile', title: '跟吵架許久的朋友和好', emoji: '🤝', hours: 2, necessary: false, meaningful: true, key: '人學探索' },
-    { id: 'bucket_list', title: '完成一直拖延的心願', emoji: '🎈', hours: 3, necessary: false, meaningful: true, key: '靈性修養' },
-    { id: 'sunrise', title: '去看一次日出', emoji: '🌅', hours: 2, necessary: false, meaningful: true, key: '靈性修養' },
-    { id: 'say_thanks', title: '對重要的人說一句謝謝', emoji: '💌', hours: 1, necessary: false, meaningful: true, key: '終極關懷' },
-    { id: 'alone_time', title: '安靜地跟自己獨處、寫下心情', emoji: '📝', hours: 2, necessary: false, meaningful: true, key: '人學探索' },
-    { id: 'who_am_i', title: '認真想想「我到底想成為什麼樣的人」', emoji: '🧭', hours: 2, necessary: false, meaningful: true, key: '哲學思考' },
-    { id: 'cram', title: '繼續刷題準備明天的考試', emoji: '📚', hours: 4, necessary: true, meaningful: false, key: '價值思辨' },
-    { id: 'reply_boss', title: '回覆老師/教練交代的任務訊息', emoji: '📩', hours: 2, necessary: true, meaningful: false, key: '價值思辨' },
-    { id: 'scroll_phone', title: '滑手機、漫無目的滑社群', emoji: '📱', hours: 3, necessary: false, meaningful: false, key: null },
-    { id: 'chores', title: '打掃房間、處理雜務', emoji: '🧹', hours: 2, necessary: true, meaningful: false, key: null },
-  ];
+  // 任務2：一分鐘蒼蠅挑戰（真的 60 秒倒數 + 5 選 + 分類）
+  const TASK2_POOL = ['陪伴家人', '完成作業', '滑手機', '向朋友道歉', '幫助別人', '運動', '吃飯', '睡覺', '說出心裡話', '完成想做的事'];
+  const TASK2_CATS = ['重要', '必要', '兩者都是', '依情境而定'];
+  const [g1FlyPhase, setG1FlyPhase] = useState<'pick' | 'classify'>('pick');
+  const [g1FlySelected, setG1FlySelected] = useState<string[]>([]);
+  const [g1FlyClassify, setG1FlyClassify] = useState<Record<string, string>>({});
+  const [g1FlyTimer, setG1FlyTimer] = useState(60);
 
-  interface InnerDialogueQ {
-    id: string; prompt: string;
-    options: { label: string; key: LifeKeyId }[];
-  }
+  // 任務3：重要與必要（點卡片再點分類區）
+  const TASK3_POOL = ['完成作業', '運動', '維持友誼', '賺取生活費', '探索興趣', '幫助別人'];
+  const TASK3_ZONES = ['重要', '必要', '兩者都是', '依情境而定'];
+  const [g1SortPicked, setG1SortPicked] = useState<string | null>(null);
+  const [g1SortResult, setG1SortResult] = useState<Record<string, string>>({});
 
-  const INNER_DIALOGUE: InnerDialogueQ[] = [
-    {
-      id: 'q1',
-      prompt: '大家都說「先考上好大學，以後就會幸福」，但你心裡突然冒出一個念頭：這條路，真的是我要的嗎？',
-      options: [
-        { label: '停下來，重新想想自己真正在乎的是什麼', key: '哲學思考' },
-        { label: '先觀察身邊的人，看看他們的選擇與心情', key: '人學探索' },
-        { label: '想到「人生終究會結束」，才更該想清楚方向', key: '終極關懷' },
-        { label: '把這條路和其他可能性攤開來比較利弊', key: '價值思辨' },
-      ]
-    },
-    {
-      id: 'q2',
-      prompt: '（呼應《幸福路上》）小琪長大後，終於問自己：「我是誰？我從哪裡來？」你也試著問問自己，你會先從哪裡開始找答案？',
-      options: [
-        { label: '回顧自己走過的路，那些形塑我的經驗', key: '人學探索' },
-        { label: '安靜下來，向內感受此刻真實的自己', key: '靈性修養' },
-        { label: '思考「自我」這個概念本身是什麼意思', key: '哲學思考' },
-        { label: '想想自己一直以來最珍惜、最捨不得的是什麼', key: '終極關懷' },
-      ]
-    },
-    {
-      id: 'q3',
-      prompt: '身邊的人都期待你走某一條路，但那不完全是你想要的。你會怎麼面對這份「被期待」的壓力？',
-      options: [
-        { label: '誠實表達自己的想法，即使可能讓人失望', key: '價值思辨' },
-        { label: '找時間跟自己獨處，先安頓好內心再決定', key: '靈性修養' },
-        { label: '試著理解對方期待背後真正的擔心是什麼', key: '人學探索' },
-        { label: '把選擇放回「什麼才是我要的幸福」這個問題上', key: '哲學思考' },
-      ]
-    },
-    {
-      id: 'q4',
-      prompt: '（呼應一分鐘蒼蠅）時間不斷倒數，如果只剩很少時間，你最想先確認的一件事是什麼？',
-      options: [
-        { label: '我有沒有好好愛過、陪伴過重要的人', key: '終極關懷' },
-        { label: '我有沒有誠實面對過真正的自己', key: '靈性修養' },
-        { label: '我做的選擇，是不是符合我真正相信的價值', key: '價值思辨' },
-        { label: '我對「活著」這件事，是不是想得夠清楚', key: '哲學思考' },
-      ]
+  // 任務4：自我探索站（三欄多選，即時組成探索宣言）
+  const TASK4_COL1 = ['好奇', '堅持', '敏感', '溫暖', '獨立', '樂觀'];
+  const TASK4_COL2 = ['家人', '朋友', '學校', '社會文化', '過去經驗', '個人選擇'];
+  const TASK4_COL3 = ['有能力的人', '能關心他人的人', '勇於追求理想的人', '能獨立思考的人', '能面對挫折的人', '能活出自己的人'];
+  const [g1DeclareCols, setG1DeclareCols] = useState<{ col1: string[]; col2: string[]; col3: string[] }>({ col1: [], col2: [], col3: [] });
+
+  // 幸福之門：選一個願意實踐的行動
+  const GATE_ACTIONS = ['向一個人表達感謝', '主動幫助一個人', '花五分鐘專心感受生活', '記錄今天最重要的一件事', '完成一個小步驟', '寫下想培養的習慣'];
+  const [g1GateAction, setG1GateAction] = useState<string | null>(null);
+
+  // 60 秒真倒數計時器
+  useEffect(() => {
+    if (g1Stage === 'task2' && g1FlyPhase === 'pick' && g1FlyTimer > 0) {
+      const timer = setTimeout(() => setG1FlyTimer(t => t - 1), 1000);
+      return () => clearTimeout(timer);
     }
-  ];
+    if (g1Stage === 'task2' && g1FlyPhase === 'pick' && g1FlyTimer === 0 && g1FlySelected.length > 0) {
+      setG1FlyPhase('classify');
+    }
+  }, [g1Stage, g1FlyPhase, g1FlyTimer, g1FlySelected.length]);
 
   const KEY_ORDER: LifeKeyId[] = ['哲學思考', '人學探索', '終極關懷', '價值思辨', '靈性修養'];
 
@@ -727,54 +699,100 @@ export default function InteractiveQuestTab({
     },
   };
 
-  const g1TotalHours = 24;
-  const g1UsedHours = g1Chosen.reduce((sum, id) => sum + (LIFE_CARDS.find(c => c.id === id)?.hours || 0), 0);
-  const g1RemainingHours = g1TotalHours - g1UsedHours;
-
-  const toggleLifeCard = (id: string) => {
-    const card = LIFE_CARDS.find(c => c.id === id);
-    if (!card) return;
-    setG1Chosen(prev => {
-      if (prev.includes(id)) return prev.filter(x => x !== id);
-      if (g1UsedHours + card.hours > g1TotalHours) {
-        showToast('⏰ 時間不夠了！24 小時已經分配得差不多囉');
-        return prev;
-      }
-      return [...prev, id];
+  // ---- 任務1 邏輯 ----
+  const toggleTask1Item = (item: string) => {
+    setG1Path(prev => {
+      if (prev.includes(item)) return prev.filter(x => x !== item);
+      if (prev.length >= 5) { showToast('⭐ 路徑最多放 5 個元素，先移除一個再加入新的吧'); return prev; }
+      return [...prev, item];
     });
   };
-
-  const finishAllocation = () => {
-    if (g1Chosen.length < 3) {
-      showToast('⏳ 再多選幾項吧，想想這 24 小時你真正想做的事！');
-      return;
-    }
-    setG1Stage('dialogue');
+  const finishTask1 = () => {
+    if (g1Path.length < 3) { showToast('🧭 至少選 3 個元素，設計出屬於你的幸福路徑吧'); return; }
+    setG1Done(prev => ({ ...prev, task1: true }));
+    showToast('🔑 完成「打破幸福公式」，獲得哲學思考鑰匙！');
+    setG1Stage('lobby');
   };
 
-  const handleDialogueAnswer = (optIdx: number) => {
-    const nextAnswers = { ...g1DialogueAnswers, [g1DialogueStep]: optIdx };
-    setG1DialogueAnswers(nextAnswers);
-    const nextStep = g1DialogueStep + 1;
-    setG1DialogueStep(nextStep);
-    if (nextStep >= INNER_DIALOGUE.length) {
-      setG1Stage('summon');
+  // ---- 任務2 邏輯 ----
+  const toggleFlySelect = (item: string) => {
+    if (g1FlyPhase !== 'pick') return;
+    setG1FlySelected(prev => {
+      if (prev.includes(item)) return prev.filter(x => x !== item);
+      if (prev.length >= 5) { showToast('⏰ 已經選滿 5 件事囉'); return prev; }
+      return [...prev, item];
+    });
+  };
+  const classifyFlyItem = (item: string, cat: string) => {
+    setG1FlyClassify(prev => ({ ...prev, [item]: cat }));
+  };
+  const finishTask2 = () => {
+    if (Object.keys(g1FlyClassify).length < g1FlySelected.length || g1FlySelected.length === 0) {
+      showToast('💭 請為每一件選中的事完成分類'); return;
     }
+    setG1Done(prev => ({ ...prev, task2: true }));
+    showToast('🔑 完成「一分鐘蒼蠅挑戰」，獲得終極關懷鑰匙！');
+    setG1Stage('lobby');
+  };
+
+  // ---- 任務3 邏輯 ----
+  const pickTask3Card = (card: string) => {
+    setG1SortPicked(card);
+    showToast('🖐️ 拿起「' + card + '」，點選要放入的分類區');
+  };
+  const dropTask3Zone = (zone: string) => {
+    if (!g1SortPicked) { showToast('請先點選下方一張卡片'); return; }
+    setG1SortResult(prev => ({ ...prev, [g1SortPicked!]: zone }));
+    setG1SortPicked(null);
+  };
+  const finishTask3 = () => {
+    if (Object.keys(g1SortResult).length < TASK3_POOL.length) { showToast('⚖️ 還有卡片尚未分類完成'); return; }
+    setG1Done(prev => ({ ...prev, task3: true }));
+    showToast('🔑 完成「重要與必要」，獲得價值思辨鑰匙！');
+    setG1Stage('lobby');
+  };
+
+  // ---- 任務4 邏輯 ----
+  const toggleDeclareChip = (col: 'col1' | 'col2' | 'col3', item: string) => {
+    setG1DeclareCols(prev => {
+      const arr = prev[col];
+      const next = arr.includes(item) ? arr.filter(x => x !== item) : [...arr, item];
+      return { ...prev, [col]: next };
+    });
+  };
+  const finishTask4 = () => {
+    const total = g1DeclareCols.col1.length + g1DeclareCols.col2.length + g1DeclareCols.col3.length;
+    if (total < 3) { showToast('🪞 三個欄位都至少選一個，才能完成探索喔'); return; }
+    setG1Done(prev => ({ ...prev, task4: true }));
+    showToast('🔑 完成「自我探索站」，獲得人學探索鑰匙！');
+    setG1Stage('lobby');
+  };
+
+  // ---- 幸福之門 ----
+  const enterGate = () => {
+    if (!g1Done.task1 || !g1Done.task2 || !g1Done.task3 || !g1Done.task4) {
+      showToast('🔒 幸福之門還沒開啟，先完成前面 4 項任務吧！');
+      return;
+    }
+    setG1Stage('gate');
+  };
+  const finishGate = () => {
+    if (!g1GateAction) { showToast('💫 先選出一個你願意實踐的行動'); return; }
+    setG1Done(prev => ({ ...prev, gate: true }));
+    setG1Stage('summon');
   };
 
   const getKeyScores = (): Record<LifeKeyId, number> => {
-    const scores: Record<LifeKeyId, number> = { '哲學思考': 0, '人學探索': 0, '終極關懷': 0, '價值思辨': 0, '靈性修養': 0 };
-    g1Chosen.forEach(id => {
-      const card = LIFE_CARDS.find(c => c.id === id);
-      if (card?.key && card.meaningful) scores[card.key] += card.hours;
-    });
-    INNER_DIALOGUE.forEach((q, idx) => {
-      const optIdx = g1DialogueAnswers[idx];
-      if (optIdx !== undefined && q.options[optIdx]) {
-        scores[q.options[optIdx].key] += 3;
-      }
-    });
-    return scores;
+    const importantCount = Object.values(g1FlyClassify).filter(c => c === '重要').length;
+    const nuancedCount = Object.values(g1SortResult).filter(c => c === '依情境而定' || c === '兩者都是').length;
+    const declareTotal = g1DeclareCols.col1.length + g1DeclareCols.col2.length + g1DeclareCols.col3.length;
+    return {
+      '哲學思考': g1Path.length,
+      '終極關懷': importantCount * 1.5,
+      '價值思辨': nuancedCount * 1.5 + Object.keys(g1SortResult).length * 0.5,
+      '人學探索': declareTotal,
+      '靈性修養': g1GateAction ? 5 : 0,
+    };
   };
 
   const getTopKey = (): LifeKeyId => {
@@ -786,9 +804,9 @@ export default function InteractiveQuestTab({
   };
 
   const getAwarenessIndex = (): number => {
-    if (g1Chosen.length === 0) return 0;
-    const meaningfulCount = g1Chosen.filter(id => LIFE_CARDS.find(c => c.id === id)?.meaningful).length;
-    return Math.round((meaningfulCount / g1Chosen.length) * 100);
+    if (g1FlySelected.length === 0) return 0;
+    const importantCount = Object.values(g1FlyClassify).filter(c => c === '重要').length;
+    return Math.round((importantCount / g1FlySelected.length) * 100);
   };
 
   const revealG1Result = () => {
@@ -796,23 +814,38 @@ export default function InteractiveQuestTab({
     const topKey = getTopKey();
     const awareness = getAwarenessIndex();
     saveGameResult('mbti', {
-      chosenCards: g1Chosen,
-      dialogueAnswers: g1DialogueAnswers,
+      path: g1Path,
+      flySelected: g1FlySelected,
+      flyClassify: g1FlyClassify,
+      sortResult: g1SortResult,
+      declareCols: g1DeclareCols,
+      gateAction: g1GateAction,
       keyScores: scores,
       topKey,
       topKeyLabel: topKey,
       awarenessIndex: awareness,
+      allDone: true,
     });
     setG1Stage('result');
     showToast('🎉 你的生命英雄已經覺醒！');
   };
 
   const resetG1 = () => {
-    setG1Stage('intro');
-    setG1Chosen([]);
-    setG1DialogueAnswers({});
-    setG1DialogueStep(0);
+    setG1Stage('lobby');
+    setG1Done({ task1: false, task2: false, task3: false, task4: false, gate: false });
+    setG1Path([]);
+    setG1FlyPhase('pick');
+    setG1FlySelected([]);
+    setG1FlyClassify({});
+    setG1FlyTimer(60);
+    setG1SortPicked(null);
+    setG1SortResult({});
+    setG1DeclareCols({ col1: [], col2: [], col3: [] });
+    setG1GateAction(null);
   };
+
+  const g1DoneCount = ['task1', 'task2', 'task3', 'task4'].filter(k => g1Done[k as G1TaskId]).length;
+  const g1KeyCount = (['task1', 'task2', 'task3', 'task4', 'gate'] as G1TaskId[]).filter(k => g1Done[k]).length;
 
   // ----------------------------------------------------
   // GAME STATE 2: LIFE PUZZLE MAP
@@ -1299,13 +1332,17 @@ export default function InteractiveQuestTab({
     if (currentStudent?.studentId) {
       const mySub = submissions.find(s => s.studentId === currentStudent.studentId);
       if (mySub && mySub.games) {
-        // Game 1: 生命讀秒 24 小時
+        // Game 1: 幸福導航生命地圖
         if (mySub.games['game_mbti']?.data) {
           const g1Data = mySub.games['game_mbti'].data;
-          if (g1Data.chosenCards && g1Data.chosenCards.length > 0) {
-            setG1Chosen(g1Data.chosenCards);
-            setG1DialogueAnswers(g1Data.dialogueAnswers || {});
-            setG1DialogueStep(INNER_DIALOGUE.length);
+          if (g1Data.allDone) {
+            setG1Path(g1Data.path || []);
+            setG1FlySelected(g1Data.flySelected || []);
+            setG1FlyClassify(g1Data.flyClassify || {});
+            setG1SortResult(g1Data.sortResult || {});
+            setG1DeclareCols(g1Data.declareCols || { col1: [], col2: [], col3: [] });
+            setG1GateAction(g1Data.gateAction || null);
+            setG1Done({ task1: true, task2: true, task3: true, task4: true, gate: true });
             setG1Stage('result');
           }
         }
@@ -2095,7 +2132,7 @@ export default function InteractiveQuestTab({
             </div>
 
             {/* ------------------------------------------------------------------------------------------------- */}
-            {/* GAME VIEW 1: 生命讀秒 24 小時 */}
+            {/* GAME VIEW 1: 幸福導航｜生命地圖啟程 */}
             {/* ------------------------------------------------------------------------------------------------- */}
             {activeGameId === 1 && (
               <div id="game-view-mbti" className="space-y-6">
@@ -2106,8 +2143,8 @@ export default function InteractiveQuestTab({
                   <div className="flex items-center gap-5 z-10">
                     <div className="w-16 h-16 rounded-full bg-[#E65100] text-white flex items-center justify-center text-2xl font-black font-mono shrink-0 shadow-md">01</div>
                     <div className="space-y-1 text-left">
-                      <h2 className="text-2xl md:text-3xl font-black text-[#4A321F] flex items-center gap-2">生命讀秒：24 小時 <Timer className="w-5 h-5 text-[#E0812A]" /></h2>
-                      <p className="text-xs md:text-sm font-bold text-[#7D5C43]/90">如果生命只剩 24 小時，你會怎麼分配？在抉擇中召喚你的生命英雄。</p>
+                      <h2 className="text-2xl md:text-3xl font-black text-[#4A321F] flex items-center gap-2">幸福導航：生命地圖啟程 <Timer className="w-5 h-5 text-[#E0812A]" /></h2>
+                      <p className="text-xs md:text-sm font-bold text-[#7D5C43]/90">完成四項生命探索任務，蒐集五把幸福鑰匙，開啟屬於你的幸福之門。</p>
                     </div>
                   </div>
                   <div className="hidden md:flex items-center z-10 shrink-0 pr-2">
@@ -2115,131 +2152,291 @@ export default function InteractiveQuestTab({
                   </div>
                 </div>
 
-                {g1Stage === 'intro' && (
-                  /* ---------- STAGE 0: 蒼蠅倒數引導 ---------- */
-                  <div className="relative overflow-hidden bg-gradient-to-br from-[#1B1230] via-[#241938] to-[#150E24] border-2 border-[#4A3A6B] rounded-3xl p-10 shadow-lg text-center space-y-6">
-                    <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 40%, rgba(251,191,36,0.25), transparent 60%)' }} />
-                    <motion.div
-                      animate={{ y: [0, -10, 0], x: [0, 6, -6, 0] }}
-                      transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
-                      className="relative z-10 text-6xl"
-                    >
-                      🪰
-                    </motion.div>
-                    <div className="relative z-10 text-5xl font-black text-amber-300 font-mono tracking-wider animate-pulse">24:00:00</div>
-                    <div className="relative z-10 space-y-2 max-w-md mx-auto">
-                      <h3 className="text-lg font-black text-white">如果生命只剩 24 小時，你會怎麼過？</h3>
-                      <p className="text-xs font-bold text-white/50 leading-relaxed">呼應《一分鐘蒼蠅》的時間倒數 —— 生命中「必要」的事，不一定是「重要」的事。這次的抉擇，沒有人會告訴你答案。</p>
+                {/* HUD：任務完成度 + 鑰匙進度（除了 lobby 以外都顯示，方便隨時掌握進度） */}
+                {g1Stage !== 'summon' && g1Stage !== 'result' && (
+                  <div className="flex items-center gap-3 flex-wrap bg-white border-2 border-[#EAD5C3] rounded-2xl px-5 py-3 shadow-xs">
+                    <span className="text-xs font-black text-slate-500 flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5 text-[#E65100]" /> 任務完成度 <b className="text-[#E65100]">{Math.round((g1DoneCount / 4) * 100)}%</b></span>
+                    <span className="text-slate-300">|</span>
+                    <span className="text-xs font-black text-slate-500 flex items-center gap-1.5">🔑 鑰匙進度 <b className="text-[#E65100]">{g1KeyCount} / 5</b></span>
+                    {g1Stage !== 'lobby' && (
+                      <button onClick={() => setG1Stage('lobby')} className="ml-auto text-xs font-black text-slate-400 hover:text-[#E65100] flex items-center gap-1 cursor-pointer">
+                        <ArrowLeft className="w-3.5 h-3.5" /> 回到地圖
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {g1Stage === 'lobby' && (
+                  /* ---------- 大廳地圖：4 個任務站 + 幸福之門 ---------- */
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {([
+                        { id: 'task1' as G1TaskId, num: '任務1', title: '打破幸福公式', emoji: '📝', desc: '重新思考幸福的路徑', color: 'border-violet-300 bg-violet-50' },
+                        { id: 'task2' as G1TaskId, num: '任務2', title: '一分鐘蒼蠅挑戰', emoji: '⏰', desc: '如果生命只剩24小時...', color: 'border-teal-300 bg-teal-50' },
+                        { id: 'task3' as G1TaskId, num: '任務3', title: '重要與必要', emoji: '⚖️', desc: '分辨什麼是重要？什麼是必要？', color: 'border-orange-300 bg-orange-50' },
+                        { id: 'task4' as G1TaskId, num: '任務4', title: '自我探索站', emoji: '🪞', desc: '我是誰？從何而來？', color: 'border-pink-300 bg-pink-50' },
+                      ]).map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => setG1Stage(t.id)}
+                          className={`text-left p-5 rounded-3xl border-2 ${t.color} hover:shadow-md transition-all cursor-pointer active:scale-98 relative overflow-hidden`}
+                        >
+                          {g1Done[t.id] && (
+                            <span className="absolute top-3 right-3 w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-sm">
+                              <Check className="w-4 h-4" />
+                            </span>
+                          )}
+                          <span className="text-[11px] font-black text-slate-500 bg-white/70 px-2 py-0.5 rounded-full">{t.num}</span>
+                          <div className="flex items-center gap-3 mt-2">
+                            <span className="text-3xl">{t.emoji}</span>
+                            <h4 className="font-black text-[#4A321F] text-base">{t.title}</h4>
+                          </div>
+                          <p className="text-[12px] font-bold text-slate-500 mt-1.5">{t.desc}</p>
+                        </button>
+                      ))}
                     </div>
+
                     <button
-                      onClick={() => setG1Stage('allocate')}
-                      className="relative z-10 px-8 py-3 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-[#3B2107] font-black text-sm rounded-2xl shadow-lg transition-all cursor-pointer active:scale-95 flex items-center gap-2 mx-auto"
+                      onClick={enterGate}
+                      className={`w-full text-center p-5 rounded-3xl border-2 transition-all cursor-pointer active:scale-98 ${
+                        g1DoneCount === 4
+                          ? 'border-amber-400 bg-gradient-to-r from-amber-50 to-orange-50 hover:shadow-md'
+                          : 'border-slate-200 bg-slate-50 opacity-70'
+                      }`}
                     >
-                      <Sparkles className="w-4 h-4" /> 開始分配我的 24 小時
+                      <div className="flex items-center justify-center gap-3">
+                        <span className="text-3xl">{g1DoneCount === 4 ? '🚪' : '🔒'}</span>
+                        <div>
+                          <h4 className="font-black text-[#4A321F] text-base">幸福之門</h4>
+                          <p className="text-[12px] font-bold text-slate-500">
+                            {g1DoneCount === 4 ? '五把鑰匙已齊，選擇你的行動，開啟屬於你的幸福之門！' : `還需完成 ${4 - g1DoneCount} 項任務才能開啟`}
+                          </p>
+                        </div>
+                      </div>
                     </button>
                   </div>
                 )}
 
-                {g1Stage === 'allocate' && (
-                  /* ---------- STAGE 1: 24 小時資源分配 ---------- */
+                {g1Stage === 'task1' && (
+                  /* ---------- 任務1：打破幸福公式 ---------- */
                   <div className="space-y-4">
-                    <div className="bg-white border-2 border-[#EAD5C3] rounded-3xl p-5 shadow-sm flex items-center gap-4">
-                      <div
-                        className="w-16 h-16 rounded-full shrink-0 flex items-center justify-center"
-                        style={{ background: `conic-gradient(#E65100 ${(g1UsedHours / g1TotalHours) * 100}%, #EAD5C3 0)` }}
-                      >
-                        <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-[11px] font-black text-[#4A321F] text-center leading-tight">
-                          剩<br />{g1RemainingHours}h
-                        </div>
+                    <div className="bg-white border-2 border-[#EAD5C3] rounded-3xl p-5 shadow-sm">
+                      <h3 className="font-black text-[#4A321F] text-sm mb-2">原來的公式是這樣，但幸福一定只能這樣嗎？</h3>
+                      <div className="flex items-center gap-2 flex-wrap text-xs font-black text-slate-500">
+                        <span className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl">用功讀書</span><ChevronRight className="w-3.5 h-3.5" />
+                        <span className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl">好大學</span><ChevronRight className="w-3.5 h-3.5" />
+                        <span className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl">好工作</span><ChevronRight className="w-3.5 h-3.5" />
+                        <span className="px-3 py-1.5 bg-pink-50 border border-pink-200 rounded-xl">幸福？</span>
                       </div>
-                      <div className="flex-1">
-                        <h4 className="font-black text-[#4A321F] text-sm">選出你想用這 24 小時做的事</h4>
-                        <p className="text-[12px] font-bold text-slate-400">點擊卡片加入 / 移除，時間到了就送出（至少選 3 項）</p>
-                      </div>
-                      <button
-                        onClick={finishAllocation}
-                        className="px-5 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white font-black text-xs rounded-xl shadow-sm transition-all cursor-pointer active:scale-98 shrink-0"
-                      >
-                        送出分配 →
-                      </button>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {LIFE_CARDS.map((card) => {
-                        const isChosen = g1Chosen.includes(card.id);
-                        return (
-                          <button
-                            key={card.id}
-                            onClick={() => toggleLifeCard(card.id)}
-                            className={`text-left p-4 rounded-2xl border-2 transition-all cursor-pointer active:scale-98 ${
-                              isChosen
-                                ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-200 shadow-sm'
-                                : 'border-[#F1E0CE] bg-white hover:border-orange-200'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <span className="text-2xl">{card.emoji}</span>
-                              <span className="text-[11px] font-black text-[#B4570B] bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-full shrink-0">{card.hours} 小時</span>
-                            </div>
-                            <p className="text-xs font-black text-[#4A321F] mt-2 leading-snug">{card.title}</p>
-                          </button>
-                        );
-                      })}
+                    <div className="bg-[#FCFAF7] border-2 border-[#EAD5C3] rounded-3xl p-5 shadow-sm">
+                      <h4 className="font-black text-[#4A321F] text-xs mb-3">重新排列，設計屬於你的幸福路徑（點選 3～5 個元素，依你點選的順序排列）</h4>
+                      <div className="min-h-[60px] flex items-center gap-2 flex-wrap mb-4 p-3 bg-white rounded-2xl border-2 border-dashed border-orange-200">
+                        {g1Path.length === 0 && <span className="text-xs font-bold text-slate-300">尚未選擇，點下方詞卡加入路徑</span>}
+                        {g1Path.map((item, idx) => (
+                          <React.Fragment key={item}>
+                            {idx > 0 && <ChevronRight className="w-3.5 h-3.5 text-orange-300" />}
+                            <span className="px-3 py-1.5 bg-orange-500 text-white text-xs font-black rounded-xl">{item}</span>
+                          </React.Fragment>
+                        ))}
+                        {g1Path.length > 0 && <><ChevronRight className="w-3.5 h-3.5 text-orange-300" /><span className="px-3 py-1.5 bg-pink-500 text-white text-xs font-black rounded-xl">幸福！</span></>}
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        {TASK1_POOL.map((item) => {
+                          const chosen = g1Path.includes(item);
+                          return (
+                            <button
+                              key={item}
+                              onClick={() => toggleTask1Item(item)}
+                              className={`p-3 rounded-2xl border-2 text-xs font-black transition-all cursor-pointer active:scale-98 ${
+                                chosen ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-[#F1E0CE] bg-white text-[#4A321F] hover:border-orange-200'
+                              }`}
+                            >
+                              {item}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
+                    <button onClick={finishTask1} className="w-full py-3 bg-[#E65100] hover:bg-[#D84315] text-white font-black text-sm rounded-2xl shadow-sm transition-all cursor-pointer active:scale-98">完成排列 → 檢視我的幸福路徑</button>
                   </div>
                 )}
 
-                {g1Stage === 'dialogue' && (
-                  /* ---------- STAGE 2: 內心對話 (呼應幸福路上) ---------- */
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                    <div className="lg:col-span-3 space-y-4">
-                      <div className="bg-[#FCFAF7] border-2 border-[#EAD5C3] rounded-3xl p-5 shadow-xs text-left">
-                        <h4 className="font-black text-[#4A321F] text-xs pb-2 mb-3.5 flex items-center gap-1.5">
-                          <TrendingUp className="w-3.5 h-3.5 text-[#E65100]" /><span>對話進度</span>
-                        </h4>
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-16 h-16 rounded-full shrink-0 flex items-center justify-center"
-                            style={{ background: `conic-gradient(#E65100 ${(g1DialogueStep / INNER_DIALOGUE.length) * 100}%, #EAD5C3 0)` }}
-                          >
-                            <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-[12.5px] font-black text-[#4A321F]">
-                              {g1DialogueStep}/{INNER_DIALOGUE.length}
-                            </div>
-                          </div>
-                          <p className="text-[12.5px] font-bold text-slate-500 leading-relaxed">跟自己誠實對話，沒有標準答案。</p>
-                        </div>
+                {g1Stage === 'task2' && (
+                  /* ---------- 任務2：一分鐘蒼蠅挑戰（真倒數） ---------- */
+                  <div className="space-y-4">
+                    <div className="bg-gradient-to-br from-[#1B1230] to-[#241938] border-2 border-[#4A3A6B] rounded-3xl p-6 text-center space-y-3">
+                      <p className="text-xs font-bold text-white/60">假如你只剩下 24 小時可以活……請從周圍的生命事件中，挑選出你最想完成的 5 件事</p>
+                      <div className={`text-4xl font-black font-mono ${g1FlyPhase === 'pick' ? 'text-amber-300 animate-pulse' : 'text-emerald-300'}`}>
+                        {g1FlyPhase === 'pick' ? `${g1FlyTimer}s` : '⏱ 時間到！'}
                       </div>
-                      <div className="bg-[#FFFDF9] border-2 border-[#EAD5C3] rounded-3xl p-5 shadow-xs text-left space-y-2">
-                        <h4 className="font-black text-[#4A321F] text-xs flex items-center gap-1.5">💭 小提醒</h4>
-                        <p className="text-[12.5px] font-bold text-slate-500 leading-relaxed">憑直覺選擇最貼近你此刻心情的答案，就像《幸福路上》的小琪一樣，慢慢認識自己。</p>
-                      </div>
+                      <p className="text-[11px] font-bold text-white/40">{g1FlyPhase === 'pick' ? '時間倒數中，請專注選擇！' : '請為每一件選中的事完成分類'}</p>
                     </div>
 
-                    <div className="lg:col-span-9 bg-white border-2 border-[#EAD5C3] rounded-3xl p-6 shadow-sm text-left">
-                      <div className="flex justify-between items-center border-b-2 border-[#F1E0CE]/60 pb-3 mb-4">
-                        <span className="text-xs font-black text-slate-500 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg">第 {g1DialogueStep + 1} 題 / 共 {INNER_DIALOGUE.length} 題</span>
+                    {g1FlyPhase === 'pick' ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                        {TASK2_POOL.map((item) => {
+                          const chosen = g1FlySelected.includes(item);
+                          return (
+                            <button
+                              key={item}
+                              onClick={() => toggleFlySelect(item)}
+                              className={`p-3 rounded-2xl border-2 text-xs font-black transition-all cursor-pointer active:scale-98 ${
+                                chosen ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-[#F1E0CE] bg-white text-[#4A321F] hover:border-teal-200'
+                              }`}
+                            >
+                              {item}
+                            </button>
+                          );
+                        })}
                       </div>
-                      <h3 className="text-base font-black text-[#4A321F] leading-relaxed mb-4">{INNER_DIALOGUE[g1DialogueStep].prompt}</h3>
+                    ) : (
                       <div className="space-y-3">
-                        {INNER_DIALOGUE[g1DialogueStep].options.map((opt, idx) => (
+                        {g1FlySelected.map((item) => (
+                          <div key={item} className="bg-white border-2 border-[#EAD5C3] rounded-2xl p-4 flex items-center gap-3 flex-wrap">
+                            <span className="text-xs font-black text-[#4A321F] flex-1">{item}</span>
+                            <div className="flex gap-2 flex-wrap">
+                              {TASK2_CATS.map((cat) => (
+                                <button
+                                  key={cat}
+                                  onClick={() => classifyFlyItem(item, cat)}
+                                  className={`px-3 py-1.5 rounded-xl text-[11px] font-black border-2 transition-all cursor-pointer ${
+                                    g1FlyClassify[item] === cat ? 'border-teal-500 bg-teal-500 text-white' : 'border-slate-200 text-slate-500 hover:border-teal-300'
+                                  }`}
+                                >
+                                  {cat}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        <button onClick={finishTask2} className="w-full py-3 bg-[#0F766E] hover:bg-[#0d6058] text-white font-black text-sm rounded-2xl shadow-sm transition-all cursor-pointer active:scale-98">完成分類</button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {g1Stage === 'task3' && (
+                  /* ---------- 任務3：重要與必要 ---------- */
+                  <div className="space-y-4">
+                    <div className="bg-white border-2 border-[#EAD5C3] rounded-3xl p-5 shadow-sm">
+                      <h4 className="font-black text-[#4A321F] text-xs mb-3">先點下方一張卡片「拿起來」，再點上方分類區「放進去」</h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {TASK3_ZONES.map((zone) => (
                           <button
-                            key={idx}
-                            onClick={() => handleDialogueAnswer(idx)}
-                            className="w-full text-left p-3.5 rounded-2xl border-2 border-[#F1E0CE] hover:border-[#E65100] hover:bg-orange-50/50 transition-all shadow-xs cursor-pointer flex items-center gap-3 group active:scale-98"
+                            key={zone}
+                            onClick={() => dropTask3Zone(zone)}
+                            className="min-h-[110px] p-3 rounded-2xl border-2 border-dashed border-orange-200 bg-orange-50/40 hover:bg-orange-50 transition-all cursor-pointer text-center"
                           >
-                            <span className="w-7 h-7 rounded-full bg-slate-400 text-white text-xs font-black flex items-center justify-center shrink-0">
-                              {String.fromCharCode(65 + idx)}
-                            </span>
-                            <span className="text-xs font-black text-[#4A321F] group-hover:text-[#E65100]">{opt.label}</span>
+                            <h5 className="font-black text-xs text-[#B4570B] mb-2">{zone}</h5>
+                            <div className="flex flex-wrap gap-1.5 justify-center">
+                              {Object.entries(g1SortResult).filter(([, z]) => z === zone).map(([card]) => (
+                                <span key={card} className="px-2 py-1 bg-white border border-orange-200 rounded-lg text-[10.5px] font-black text-[#4A321F]">{card}</span>
+                              ))}
+                            </div>
                           </button>
                         ))}
                       </div>
                     </div>
+                    <div className="bg-[#FCFAF7] border-2 border-[#EAD5C3] rounded-3xl p-5">
+                      <h4 className="font-black text-[#4A321F] text-xs mb-3">可拖曳的卡片（點擊拿起）</h4>
+                      <div className="flex flex-wrap gap-2.5">
+                        {TASK3_POOL.filter(c => !g1SortResult[c]).map((card) => (
+                          <button
+                            key={card}
+                            onClick={() => pickTask3Card(card)}
+                            className={`px-4 py-2.5 rounded-2xl border-2 text-xs font-black transition-all cursor-pointer active:scale-98 ${
+                              g1SortPicked === card ? 'border-orange-500 bg-orange-500 text-white' : 'border-[#F1E0CE] bg-white text-[#4A321F] hover:border-orange-200'
+                            }`}
+                          >
+                            {card}
+                          </button>
+                        ))}
+                        {TASK3_POOL.every(c => g1SortResult[c]) && <span className="text-xs font-bold text-emerald-600">🎉 全部分類完成！</span>}
+                      </div>
+                    </div>
+                    <button onClick={finishTask3} className="w-full py-3 bg-[#B4570B] hover:bg-[#9c4a08] text-white font-black text-sm rounded-2xl shadow-sm transition-all cursor-pointer active:scale-98">確認分類</button>
+                  </div>
+                )}
+
+                {g1Stage === 'task4' && (
+                  /* ---------- 任務4：自我探索站 ---------- */
+                  <div className="space-y-4">
+                    <div className="bg-white border-2 border-[#EAD5C3] rounded-3xl p-5 shadow-sm">
+                      <p className="text-xs font-bold text-slate-500 mb-4">透過探索，認識真實的自己，打造屬於你的幸福地圖！（每欄可複選）</p>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {([
+                          { col: 'col1' as const, num: '1', title: '我是誰？', items: TASK4_COL1, color: 'text-red-600' },
+                          { col: 'col2' as const, num: '2', title: '我從何而來？', items: TASK4_COL2, color: 'text-violet-600' },
+                          { col: 'col3' as const, num: '3', title: '我希望成為什麼樣的人？', items: TASK4_COL3, color: 'text-teal-600' },
+                        ]).map((c) => (
+                          <div key={c.col} className="bg-[#FCFAF7] border-2 border-[#EAD5C3] rounded-2xl p-4">
+                            <h5 className={`font-black text-xs mb-3 ${c.color}`}>{c.num}　{c.title}</h5>
+                            <div className="flex flex-wrap gap-2">
+                              {c.items.map((item) => {
+                                const chosen = g1DeclareCols[c.col].includes(item);
+                                return (
+                                  <button
+                                    key={item}
+                                    onClick={() => toggleDeclareChip(c.col, item)}
+                                    className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black border-2 transition-all cursor-pointer active:scale-98 ${
+                                      chosen ? 'border-[#E65100] bg-[#E65100] text-white' : 'border-[#F1E0CE] bg-white text-[#4A321F]'
+                                    }`}
+                                  >
+                                    {item}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-[#FFFDF9] border-2 border-dashed border-orange-200 rounded-2xl p-4">
+                      <h5 className="font-black text-[11px] text-[#B4570B] mb-1.5">你的探索宣言</h5>
+                      <p className="text-xs font-bold text-[#4A321F] leading-relaxed">
+                        你重視……{[...g1DeclareCols.col1, ...g1DeclareCols.col2].join('、') || '（尚未選擇）'}
+                        {g1DeclareCols.col3.length > 0 && <>，我希望成為{g1DeclareCols.col3.join('、')}的人。</>}
+                      </p>
+                    </div>
+                    <button onClick={finishTask4} className="w-full py-3 bg-[#C2185B] hover:bg-[#a81450] text-white font-black text-sm rounded-2xl shadow-sm transition-all cursor-pointer active:scale-98">完成探索</button>
+                  </div>
+                )}
+
+                {g1Stage === 'gate' && (
+                  /* ---------- 幸福之門：選擇行動 ---------- */
+                  <div className="space-y-4">
+                    <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-3xl p-5 text-center">
+                      <h3 className="font-black text-[#4A321F] text-sm">五把鑰匙已齊，選擇你願意實踐的行動，開啟屬於你的幸福之門！</h3>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {GATE_ACTIONS.map((action) => {
+                        const chosen = g1GateAction === action;
+                        return (
+                          <button
+                            key={action}
+                            onClick={() => setG1GateAction(action)}
+                            className={`p-4 rounded-2xl border-2 text-xs font-black transition-all cursor-pointer active:scale-98 ${
+                              chosen ? 'border-amber-500 bg-amber-50 text-amber-700 ring-2 ring-amber-200' : 'border-[#F1E0CE] bg-white text-[#4A321F] hover:border-amber-200'
+                            }`}
+                          >
+                            {action}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {g1GateAction && (
+                      <div className="bg-white border-2 border-[#EAD5C3] rounded-2xl p-4 text-center">
+                        <p className="text-xs font-bold text-[#4A321F]">我的幸福行動：約定今天<span className="text-[#E65100]">「{g1GateAction}」</span>，我將用行動實踐所學，讓幸福從今天開始發光！</p>
+                      </div>
+                    )}
+                    <button onClick={finishGate} className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-black text-sm rounded-2xl shadow-lg transition-all cursor-pointer active:scale-98">✨ 開啟幸福之門</button>
                   </div>
                 )}
 
                 {g1Stage === 'summon' && (
-                  /* ---------- STAGE 3: 召喚動畫 ---------- */
+                  /* ---------- 召喚動畫 ---------- */
                   <div className="relative overflow-hidden bg-gradient-to-br from-[#1B1230] via-[#241938] to-[#150E24] border-2 border-[#4A3A6B] rounded-3xl p-10 shadow-lg text-center space-y-6">
                     <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 40%, rgba(251,191,36,0.35), transparent 60%)' }} />
                     <motion.div
@@ -2251,7 +2448,7 @@ export default function InteractiveQuestTab({
                     </motion.div>
                     <div className="relative z-10 space-y-1.5">
                       <h3 className="text-lg font-black text-amber-300">你的生命英雄即將覺醒...</h3>
-                      <p className="text-xs font-bold text-white/50">根據你的 24 小時分配與內心對話，點擊召喚屬於你的生命原型！</p>
+                      <p className="text-xs font-bold text-white/50">根據你完成的五項任務，點擊召喚屬於你的生命原型！</p>
                     </div>
                     <button
                       onClick={revealG1Result}
@@ -2263,7 +2460,7 @@ export default function InteractiveQuestTab({
                 )}
 
                 {g1Stage === 'result' && (() => {
-                  /* ---------- STAGE 4: 英雄結果卡 + 五把鑰匙雷達圖 ---------- */
+                  /* ---------- 英雄結果卡 + 五把鑰匙雷達圖 ---------- */
                   const topKey = getTopKey();
                   const hero = KEY_ARCHETYPES[topKey];
                   const heroTextColor = hero.ring.split(' ')[1];
@@ -2308,20 +2505,25 @@ export default function InteractiveQuestTab({
                       </div>
 
                       <div className="bg-white/70 rounded-2xl p-4 border border-white/80 text-left max-w-md mx-auto space-y-2">
-                        <h5 className="font-black text-xs text-slate-700">🎯 推薦優先探索單元：{hero.name === topKey ? topKey : topKey}</h5>
+                        <h5 className="font-black text-xs text-slate-700">🎯 推薦優先探索單元：{topKey}</h5>
                         <p className="text-[12px] font-bold text-slate-500 leading-relaxed">{hero.unitDesc}</p>
                         <div className="border-t border-slate-200 pt-2 flex items-center justify-between">
                           <span className="text-[11px] font-black text-slate-500">⏳ 生命自覺指數</span>
                           <span className="text-sm font-black text-[#E65100]">{awareness}%</span>
                         </div>
-                        <p className="text-[11px] font-bold text-slate-400 leading-relaxed">你選的 24 小時裡，有 {awareness}% 是真正貼近內心、而不只是「必要」的事。</p>
+                        <p className="text-[11px] font-bold text-slate-400 leading-relaxed">你在「一分鐘蒼蠅挑戰」選的 5 件事裡，有 {awareness}% 被你判斷為真正「重要」的事。</p>
+                      </div>
+
+                      <div className="bg-white/70 rounded-2xl p-4 border border-white/80 text-left max-w-md mx-auto">
+                        <h5 className="font-black text-xs text-slate-700 mb-1">💫 我的幸福行動</h5>
+                        <p className="text-[12px] font-bold text-slate-500">{g1GateAction}</p>
                       </div>
 
                       <button
                         onClick={resetG1}
                         className="px-6 py-2 border-2 border-white/70 bg-white/50 text-slate-600 font-black text-xs rounded-xl hover:bg-white/80 transition-all cursor-pointer shadow-xs active:scale-98"
                       >
-                        重新分配我的 24 小時
+                        重新開始探索
                       </button>
                     </motion.div>
                   );

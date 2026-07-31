@@ -317,7 +317,7 @@ export default function LearningRecordTab({
 
   // 6. Interactive Games Pass Rates Mapping (10 Games)
   const all10Games = [
-    { id: 'mbti', name: '生命讀秒：24小時', key: 'game_mbti' },
+    { id: 'mbti', name: '幸福導航：生命地圖啟程', key: 'game_mbti' },
     { id: 'puzzle', name: '生命拼圖地圖', key: 'game_puzzle' },
     { id: 'adventure', name: '情境選擇冒險', key: 'game_adventure' },
     { id: 'connect', name: '人際關係連連看', key: 'game_connect' },

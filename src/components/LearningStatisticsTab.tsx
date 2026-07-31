@@ -47,7 +47,7 @@ export default function LearningStatisticsTab({ submissions }: LearningStatistic
   const totalStudentsCount = submissions.length || 1;
 
   const GAME_LABELS: Array<{ key: string; label: string; emoji: string }> = [
-    { key: 'mbti', label: '生命讀秒', emoji: '⏳' },
+    { key: 'mbti', label: '幸福導航', emoji: '🚪' },
     { key: 'puzzle', label: '拼圖地圖', emoji: '🧩' },
     { key: 'adventure', label: '情境冒險', emoji: '🧭' },
     { key: 'relationships', label: '人際連連看', emoji: '🕸️' },
