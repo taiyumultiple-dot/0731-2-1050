@@ -11,7 +11,12 @@ import {
   PieChart, 
   Pie, 
   Cell, 
-  Tooltip 
+  Tooltip,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar
 } from 'recharts';
 import { 
   Gamepad2, 
@@ -38,7 +43,9 @@ import {
   Scale,
   Compass,
   Link as LinkIcon,
-  MessageSquare
+  MessageSquare,
+  Star,
+  Wand2
 } from 'lucide-react';
 
 import charKehuaImg from '../assets/images/characters/char_kehua.jpg';
@@ -609,6 +616,7 @@ export default function InteractiveQuestTab({
   const [mbtiStarted, setMbtiStarted] = useState(false);
   const [mbtiStep, setMbtiStep] = useState(0);
   const [mbtiAnswers, setMbtiAnswers] = useState<Record<number, string>>({});
+  const [mbtiRevealed, setMbtiRevealed] = useState(false);
 
   const MBTI_OPTION_COLORS = ['bg-sky-500', 'bg-emerald-500', 'bg-orange-500', 'bg-violet-500'];
 
@@ -701,6 +709,99 @@ export default function InteractiveQuestTab({
     { name: '探險家', color: 'orange', desc: '靈活應變，充滿活力，熱愛藝術，享受在當下的體驗。', types: 'ISTP · ISFP · ESTP · ESFP' },
   ];
 
+  // ----------------------------------------------------
+  // 8 大「生命英雄原型」— 把 16 型 MBTI 結果轉譯成生命教育語言
+  // ----------------------------------------------------
+  interface LifeArchetype {
+    key: string;
+    name: string;
+    emoji: string;
+    tagline: string;
+    desc: string;
+    unit: string;
+    unitDesc: string;
+    from: string; // gradient start (tailwind arbitrary-safe hex)
+    to: string;   // gradient end
+    ring: string; // border/text tailwind classes
+    chip: string; // small badge bg
+  }
+
+  const ARCHETYPE_BY_CODE: Record<string, string> = {
+    ISTJ: 'guardian', ISFJ: 'guardian',
+    ESTJ: 'navigator', ESFJ: 'navigator',
+    ISTP: 'pathfinder', ESTP: 'pathfinder',
+    ISFP: 'dreamer', ESFP: 'dreamer',
+    INTJ: 'sage', INTP: 'sage',
+    ENTJ: 'strategist', ENTP: 'strategist',
+    INFJ: 'healer', INFP: 'healer',
+    ENFJ: 'inspirer', ENFP: 'inspirer',
+  };
+
+  const LIFE_ARCHETYPES: Record<string, LifeArchetype> = {
+    guardian: {
+      key: 'guardian', name: '守護者', emoji: '🛡️',
+      tagline: '穩重可靠的生命基石',
+      desc: '你重視承諾與責任，凡事按部就班，是身邊的人最信賴的依靠。就像可華爸爸一樣，習慣用行動而不是言語，默默守護在乎的人。',
+      unit: '終極關懷', unitDesc: '學習在守護他人之餘，也練習好好照顧自己的內心。',
+      from: '#EFF6FF', to: '#DBEAFE', ring: 'border-blue-300 text-blue-700', chip: 'bg-blue-100 text-blue-700'
+    },
+    navigator: {
+      key: 'navigator', name: '領航家', emoji: '🧭',
+      tagline: '帶領大家前進的班長魂',
+      desc: '你天生具備組織與領導特質，習慣把事情安排得井井有條，樂於帶著大家一起把目標完成。',
+      unit: '價值思辨', unitDesc: '練習在領導與決策時，也留意並聽見不同的聲音。',
+      from: '#FFF7ED', to: '#FFEDD5', ring: 'border-orange-300 text-orange-700', chip: 'bg-orange-100 text-orange-700'
+    },
+    pathfinder: {
+      key: 'pathfinder', name: '拓荒者', emoji: '⚡',
+      tagline: '說做就做的行動實踐家',
+      desc: '你喜歡動手嘗試、活在當下，遇到問題總能靈活應變，是不畏懼冒險的行動派。',
+      unit: '哲學思考', unitDesc: '在快速行動之餘，也練習停下來，多想一步再出發。',
+      from: '#FEFCE8', to: '#FEF9C3', ring: 'border-yellow-400 text-yellow-700', chip: 'bg-yellow-100 text-yellow-700'
+    },
+    dreamer: {
+      key: 'dreamer', name: '造夢師', emoji: '🎨',
+      tagline: '用感受為世界上色的人',
+      desc: '你擁有豐富的感受力與美感，總能用自己的方式為周遭增添色彩，珍惜當下的每個瞬間。',
+      unit: '靈性修養', unitDesc: '透過創作與感受力，持續探索內在的成長與卓越。',
+      from: '#FDF2F8', to: '#FCE7F3', ring: 'border-pink-300 text-pink-700', chip: 'bg-pink-100 text-pink-700'
+    },
+    sage: {
+      key: 'sage', name: '智者', emoji: '🔭',
+      tagline: '追根究柢的真理探求者',
+      desc: '你熱愛探索事物背後的原理，喜歡獨立思考、追根究柢，像小文一樣對世界的奧秘充滿好奇。',
+      unit: '哲學思考', unitDesc: '善用批判思考的能力，練習理性與邏輯的思辨方法。',
+      from: '#F5F3FF', to: '#EDE9FE', ring: 'border-violet-300 text-violet-700', chip: 'bg-violet-100 text-violet-700'
+    },
+    strategist: {
+      key: 'strategist', name: '戰略家', emoji: '♟️',
+      tagline: '勇於挑戰現狀的提案人',
+      desc: '你善於分析局勢、勇於挑戰既有框架，總能提出讓人眼睛一亮的新想法。',
+      unit: '價值思辨', unitDesc: '在辯證與挑戰之中，練習真理越辯越明的智慧。',
+      from: '#FEF2F2', to: '#FEE2E2', ring: 'border-red-300 text-red-700', chip: 'bg-red-100 text-red-700'
+    },
+    healer: {
+      key: 'healer', name: '療癒者', emoji: '🌙',
+      tagline: '溫柔接住情緒的傾聽者',
+      desc: '你擁有細膩的內心世界與強烈的同理心，總能察覺他人未說出口的情緒，是最溫柔的陪伴者。',
+      unit: '終極關懷', unitDesc: '練習用愛與勇氣，陪自己也陪別人面對生命的課題。',
+      from: '#EEF2FF', to: '#E0E7FF', ring: 'border-indigo-300 text-indigo-700', chip: 'bg-indigo-100 text-indigo-700'
+    },
+    inspirer: {
+      key: 'inspirer', name: '鼓舞家', emoji: '✨',
+      tagline: '散發溫暖與希望的太陽',
+      desc: '你天生的感染力能鼓舞身邊每一個人，像博鈞和曉萍一樣，總在人群中散發溫暖與希望。',
+      unit: '人學探索', unitDesc: '在你我他交織的生命網絡中，發揮你最擅長的正向影響力。',
+      from: '#F0FDF4', to: '#DCFCE7', ring: 'border-emerald-300 text-emerald-700', chip: 'bg-emerald-100 text-emerald-700'
+    },
+  };
+
+  const getLifeArchetype = (): LifeArchetype => {
+    const code = getMbtiResult();
+    const key = ARCHETYPE_BY_CODE[code] || 'guardian';
+    return LIFE_ARCHETYPES[key];
+  };
+
   const handleMbtiAnswer = (val: string) => {
     const nextAnswers = { ...mbtiAnswers, [mbtiStep]: val };
     setMbtiAnswers(nextAnswers);
@@ -708,7 +809,8 @@ export default function InteractiveQuestTab({
     setMbtiStep(nextStep);
     if (nextStep >= mbtiQuestions.length) {
       saveGameResult('mbti', { answers: nextAnswers });
-      showToast('🎉 MBTI 測驗完成！');
+      setMbtiRevealed(false);
+      showToast('🎉 覺醒測驗完成！準備召喚你的生命英雄...');
     }
   };
 
@@ -736,6 +838,7 @@ export default function InteractiveQuestTab({
     setMbtiStep(0);
     setMbtiAnswers({});
     setMbtiStarted(false);
+    setMbtiRevealed(false);
   };
 
   // ----------------------------------------------------
@@ -1230,6 +1333,7 @@ export default function InteractiveQuestTab({
             setMbtiAnswers(mbtiData.answers);
             setMbtiStarted(true);
             setMbtiStep(mbtiQuestions.length); // Direct jump to results view
+            setMbtiRevealed(true); // Already revealed in a previous session
           }
         }
         // Game 2: Puzzle Map
@@ -2029,8 +2133,8 @@ export default function InteractiveQuestTab({
                   <div className="flex items-center gap-5 z-10">
                     <div className="w-16 h-16 rounded-full bg-[#E65100] text-white flex items-center justify-center text-2xl font-black font-mono shrink-0 shadow-md">01</div>
                     <div className="space-y-1 text-left">
-                      <h2 className="text-2xl md:text-3xl font-black text-[#4A321F]">心理測驗 MBTI</h2>
-                      <p className="text-xs md:text-sm font-bold text-[#7D5C43]/90">探索你的性格類型，了解自己與他人。</p>
+                      <h2 className="text-2xl md:text-3xl font-black text-[#4A321F] flex items-center gap-2">生命英雄覺醒 <Wand2 className="w-5 h-5 text-[#E0812A]" /></h2>
+                      <p className="text-xs md:text-sm font-bold text-[#7D5C43]/90">回答覺醒抉擇，召喚屬於你的生命英雄原型！</p>
                     </div>
                   </div>
                   <div className="hidden md:flex items-center z-10 shrink-0 pr-2">
@@ -2041,19 +2145,22 @@ export default function InteractiveQuestTab({
                 {!mbtiStarted ? (
                   /* ---------- LANDING SUB-VIEW ---------- */
                   <div className="space-y-6">
-                    <div className="bg-white border-2 border-[#EAD5C3] rounded-3xl p-6 shadow-sm space-y-4 text-left">
-                      <h3 className="font-black text-[#4A321F] text-sm flex items-center gap-2">
-                        <span>⭐</span><span>認識 16 種性格類型</span>
+                    <div className="relative overflow-hidden bg-gradient-to-br from-[#1B1230] via-[#241938] to-[#150E24] border-2 border-[#4A3A6B] rounded-3xl p-6 shadow-lg space-y-4 text-left">
+                      <div className="absolute -top-10 -right-10 w-40 h-40 bg-amber-400/20 rounded-full blur-3xl pointer-events-none" />
+                      <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-violet-400/20 rounded-full blur-3xl pointer-events-none" />
+                      <h3 className="font-black text-amber-300 text-sm flex items-center gap-2 relative z-10">
+                        <Star className="w-4 h-4 fill-amber-300" /><span>英雄圖鑑・8 種生命原型</span>
                       </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {MBTI_GROUPS.map((g) => (
-                          <div key={g.name} className={`p-4 rounded-2xl border-2 ${MBTI_GROUP_STYLES[g.color]}`}>
-                            <h4 className="font-black text-sm mb-1.5">{g.name}</h4>
-                            <p className="text-[12.5px] font-bold leading-relaxed opacity-90 mb-2.5">{g.desc}</p>
-                            <p className="text-[12px] font-black font-mono opacity-80">{g.types}</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10">
+                        {Object.values(LIFE_ARCHETYPES).map((a) => (
+                          <div key={a.key} className="rounded-2xl border border-white/15 bg-white/5 backdrop-blur-sm p-3.5 text-center hover:bg-white/10 hover:border-amber-300/50 transition-all">
+                            <div className="text-3xl mb-1.5">{a.emoji}</div>
+                            <div className="text-xs font-black text-white">{a.name}</div>
+                            <div className="text-[10.5px] font-bold text-white/50 mt-0.5 leading-snug">{a.tagline}</div>
                           </div>
                         ))}
                       </div>
+                      <p className="text-[11.5px] font-bold text-white/40 relative z-10">✦ 完成覺醒測驗，看看你會召喚出哪一位生命英雄！</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
@@ -2069,8 +2176,8 @@ export default function InteractiveQuestTab({
                         onClick={() => setMbtiStarted(true)}
                         className="bg-[#E65100] hover:bg-[#D84315] text-white rounded-3xl p-6 flex flex-col items-center justify-center gap-2 shadow-md transition-all cursor-pointer active:scale-98"
                       >
-                        <span className="flex items-center gap-2 text-base font-black"><Gamepad2 className="w-5 h-5" /> 開始作答</span>
-                        <span className="text-[12.5px] font-bold text-orange-100">準備好了嗎？讓我們一起探索真實的你！</span>
+                        <span className="flex items-center gap-2 text-base font-black"><Sparkles className="w-5 h-5" /> 開始覺醒測驗</span>
+                        <span className="text-[12.5px] font-bold text-orange-100">準備好了嗎？讓我們召喚真實的你！</span>
                       </button>
 
                       <div className="bg-[#FFFDF9] border-2 border-[#EAD5C3] rounded-3xl p-5 flex items-start gap-3 text-left shadow-xs">
@@ -2159,26 +2266,89 @@ export default function InteractiveQuestTab({
                       <p className="text-[12px] font-bold text-[#B4570B] pt-1">✨ 完成更多題目，結果會更準確喔！</p>
                     </div>
                   </div>
-                ) : (
-                  /* ---------- RESULT SUB-VIEW ---------- */
-                  <div className="bg-white border-2 border-[#EAD5C3] rounded-3xl p-8 shadow-sm text-center space-y-5">
-                    <div className="inline-flex p-4 bg-orange-100 rounded-full text-[#E65100]">
-                      <Award className="w-12 h-12" />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-xs font-black text-slate-400 uppercase tracking-widest">您的生命性格指標</div>
-                      <h3 className="text-3xl font-black text-[#E65100] tracking-wider font-mono">{getMbtiResult()}</h3>
-                    </div>
-                    <p className="text-xs text-slate-500 leading-relaxed max-w-md mx-auto font-bold bg-[#FAF5EC]/60 p-4 rounded-xl border border-[#F1E0CE]/60 text-left">
-                      這代表你格外在乎生命的內在連結。你相信生命具有無限可能，不甘於平庸，且願意給予身邊每個人溫柔的包容！
-                    </p>
-                    <button
-                      onClick={resetMbti}
-                      className="px-6 py-2 border-2 border-[#E65100] text-[#E65100] font-black text-xs rounded-xl hover:bg-orange-50 transition-all cursor-pointer shadow-xs active:scale-98"
+                ) : !mbtiRevealed ? (
+                  /* ---------- SUMMON SUB-VIEW (抽卡召喚動畫) ---------- */
+                  <div className="relative overflow-hidden bg-gradient-to-br from-[#1B1230] via-[#241938] to-[#150E24] border-2 border-[#4A3A6B] rounded-3xl p-10 shadow-lg text-center space-y-6">
+                    <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 40%, rgba(251,191,36,0.35), transparent 60%)' }} />
+                    <motion.div
+                      animate={{ rotateZ: [0, 3, -3, 0], y: [0, -8, 0] }}
+                      transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
+                      className="relative z-10 mx-auto w-36 h-52 rounded-2xl bg-gradient-to-br from-[#2b1a0e] to-[#4a2f16] border-4 border-amber-400 shadow-2xl flex items-center justify-center text-6xl"
                     >
-                      重做測驗
+                      🎴
+                    </motion.div>
+                    <div className="relative z-10 space-y-1.5">
+                      <h3 className="text-lg font-black text-amber-300">你的生命英雄即將覺醒...</h3>
+                      <p className="text-xs font-bold text-white/50">點擊卡牌，召喚屬於你的專屬生命原型！</p>
+                    </div>
+                    <button
+                      onClick={() => setMbtiRevealed(true)}
+                      className="relative z-10 px-8 py-3 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-[#3B2107] font-black text-sm rounded-2xl shadow-lg transition-all cursor-pointer active:scale-95 flex items-center gap-2 mx-auto"
+                    >
+                      <Sparkles className="w-4 h-4" /> 點擊召喚生命英雄
                     </button>
                   </div>
+                ) : (
+                  /* ---------- RESULT SUB-VIEW (英雄結果卡 + 屬性雷達圖) ---------- */
+                  (() => {
+                    const hero = getLifeArchetype();
+                    const heroTextColor = hero.ring.split(' ')[1];
+                    const statData = [
+                      { stat: '勇氣', value: mbtiAxisPercent('E', 'I') },
+                      { stat: '智慧', value: mbtiAxisPercent('N', 'S') },
+                      { stat: '同理心', value: mbtiAxisPercent('F', 'T') },
+                      { stat: '責任感', value: mbtiAxisPercent('J', 'P') },
+                    ];
+                    return (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.85 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.45, ease: 'easeOut' }}
+                        className={`relative overflow-hidden rounded-3xl border-2 p-8 shadow-lg text-center space-y-6 ${hero.ring.split(' ')[0]}`}
+                        style={{ background: `linear-gradient(135deg, ${hero.from}, ${hero.to})` }}
+                      >
+                        <div className="flex justify-center gap-1">
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                          ))}
+                        </div>
+                        <div className={`inline-flex text-[11px] font-black px-3 py-1 rounded-full ${hero.chip}`}>傳說級 SSR</div>
+                        <div className="text-7xl">{hero.emoji}</div>
+                        <div className="space-y-1">
+                          <h3 className={`text-3xl font-black ${heroTextColor}`}>{hero.name}</h3>
+                          <p className="text-xs font-bold text-slate-500">{hero.tagline}</p>
+                          <p className="text-[10.5px] font-bold text-slate-400 font-mono tracking-widest">{getMbtiResult()}</p>
+                        </div>
+                        <p className="text-xs text-slate-600 leading-relaxed max-w-md mx-auto font-bold bg-white/60 p-4 rounded-xl border border-white/80 text-left">
+                          {hero.desc}
+                        </p>
+
+                        <div className="bg-white/70 rounded-2xl p-3 border border-white/80 max-w-sm mx-auto">
+                          <h5 className="font-black text-[11px] text-slate-500 mb-1 flex items-center justify-center gap-1"><TrendingUp className="w-3.5 h-3.5" /> 屬性面板</h5>
+                          <ResponsiveContainer width="100%" height={220}>
+                            <RadarChart data={statData}>
+                              <PolarGrid stroke="#E5D5C0" />
+                              <PolarAngleAxis dataKey="stat" tick={{ fontSize: 11, fontWeight: 700, fill: '#7D5C43' }} />
+                              <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
+                              <Radar dataKey="value" stroke="#E0812A" fill="#E0812A" fillOpacity={0.45} />
+                            </RadarChart>
+                          </ResponsiveContainer>
+                        </div>
+
+                        <div className="bg-white/70 rounded-2xl p-4 border border-white/80 text-left max-w-md mx-auto">
+                          <h5 className="font-black text-xs text-slate-700 mb-1">🎯 推薦探索單元：{hero.unit}</h5>
+                          <p className="text-[12px] font-bold text-slate-500 leading-relaxed">{hero.unitDesc}</p>
+                        </div>
+
+                        <button
+                          onClick={resetMbti}
+                          className="px-6 py-2 border-2 border-white/70 bg-white/50 text-slate-600 font-black text-xs rounded-xl hover:bg-white/80 transition-all cursor-pointer shadow-xs active:scale-98"
+                        >
+                          重新覺醒
+                        </button>
+                      </motion.div>
+                    );
+                  })()
                 )}
               </div>
             )}
