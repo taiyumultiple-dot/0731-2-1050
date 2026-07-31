@@ -2169,51 +2169,87 @@ export default function InteractiveQuestTab({
                 {g1Stage === 'lobby' && (
                   /* ---------- 大廳地圖：4 個任務站 + 幸福之門 ---------- */
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {([
-                        { id: 'task1' as G1TaskId, num: '任務1', title: '打破幸福公式', emoji: '📝', desc: '重新思考幸福的路徑', color: 'border-violet-300 bg-violet-50' },
-                        { id: 'task2' as G1TaskId, num: '任務2', title: '一分鐘蒼蠅挑戰', emoji: '⏰', desc: '如果生命只剩24小時...', color: 'border-teal-300 bg-teal-50' },
-                        { id: 'task3' as G1TaskId, num: '任務3', title: '重要與必要', emoji: '⚖️', desc: '分辨什麼是重要？什麼是必要？', color: 'border-orange-300 bg-orange-50' },
-                        { id: 'task4' as G1TaskId, num: '任務4', title: '自我探索站', emoji: '🪞', desc: '我是誰？從何而來？', color: 'border-pink-300 bg-pink-50' },
-                      ]).map((t) => (
-                        <button
-                          key={t.id}
-                          onClick={() => setG1Stage(t.id)}
-                          className={`text-left p-5 rounded-3xl border-2 ${t.color} hover:shadow-md transition-all cursor-pointer active:scale-98 relative overflow-hidden`}
-                        >
-                          {g1Done[t.id] && (
-                            <span className="absolute top-3 right-3 w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-sm">
-                              <Check className="w-4 h-4" />
-                            </span>
-                          )}
-                          <span className="text-[11px] font-black text-slate-500 bg-white/70 px-2 py-0.5 rounded-full">{t.num}</span>
-                          <div className="flex items-center gap-3 mt-2">
-                            <span className="text-3xl">{t.emoji}</span>
-                            <h4 className="font-black text-[#4A321F] text-base">{t.title}</h4>
-                          </div>
-                          <p className="text-[12px] font-bold text-slate-500 mt-1.5">{t.desc}</p>
-                        </button>
-                      ))}
+                    {/* 可華導覽對話框 */}
+                    <div className="flex items-center gap-3 bg-white border-2 border-[#EAD5C3] rounded-2xl p-3 shadow-xs">
+                      <img src={charKehuaImg} alt="可華" className="w-11 h-11 rounded-full object-cover border-2 border-[#E0812A] shadow-sm shrink-0" referrerPolicy="no-referrer" />
+                      <p className="text-xs font-bold text-[#4A321F] leading-relaxed">
+                        {g1DoneCount === 0 && '我是可華，一起探索屬於我的幸福答案吧！先從任意一個任務站開始吧！'}
+                        {g1DoneCount > 0 && g1DoneCount < 4 && `已經完成 ${g1DoneCount} 項任務囉，繼續加油，集滿五把鑰匙就能開啟幸福之門！`}
+                        {g1DoneCount === 4 && '最後一步了！點選幸福之門，選擇你願意實踐的行動吧！'}
+                      </p>
+                    </div>
+
+                    {/* 地圖裝飾背景：虛線路徑連接 4 個任務站 + 幸福之門 */}
+                    <div className="relative rounded-3xl bg-gradient-to-br from-emerald-50 via-sky-50 to-amber-50 border-2 border-[#EAD5C3] p-4 md:p-6 overflow-hidden">
+                      <svg className="absolute inset-0 w-full h-full hidden sm:block pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        <path d="M 25 25 Q 50 40 50 55 Q 50 70 75 75" fill="none" stroke="#E0812A" strokeWidth="0.6" strokeDasharray="2 2" opacity="0.4" />
+                        <path d="M 75 25 Q 55 40 50 55 Q 45 70 25 75" fill="none" stroke="#E0812A" strokeWidth="0.6" strokeDasharray="2 2" opacity="0.4" />
+                      </svg>
+
+                      <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {([
+                          { id: 'task1' as G1TaskId, num: '任務 1', title: '打破幸福公式', emoji: '📝', desc: '重新思考幸福的路徑', ring: 'border-violet-300', bg: 'bg-white', badge: 'bg-violet-500' },
+                          { id: 'task2' as G1TaskId, num: '任務 2', title: '一分鐘蒼蠅挑戰', emoji: '⏰', desc: '如果生命只剩24小時...', ring: 'border-teal-300', bg: 'bg-white', badge: 'bg-teal-600' },
+                          { id: 'task3' as G1TaskId, num: '任務 3', title: '重要與必要', emoji: '⚖️', desc: '分辨什麼是重要？什麼是必要？', ring: 'border-orange-300', bg: 'bg-white', badge: 'bg-orange-500' },
+                          { id: 'task4' as G1TaskId, num: '任務 4', title: '自我探索站', emoji: '🪞', desc: '我是誰？從何而來？', ring: 'border-pink-300', bg: 'bg-white', badge: 'bg-pink-600' },
+                        ]).map((t) => (
+                          <button
+                            key={t.id}
+                            onClick={() => setG1Stage(t.id)}
+                            className={`text-left p-5 rounded-3xl border-2 ${t.ring} ${t.bg} hover:shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer active:scale-98 relative overflow-hidden shadow-sm`}
+                          >
+                            {g1Done[t.id] && (
+                              <span className="absolute top-3 right-3 w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-sm z-10">
+                                <Check className="w-4 h-4" />
+                              </span>
+                            )}
+                            <span className={`inline-block text-[11px] font-black text-white ${t.badge} px-3 py-1 rounded-full shadow-sm`}>{t.num}</span>
+                            <div className="flex items-center gap-3 mt-3">
+                              <span className="text-3xl">{t.emoji}</span>
+                              <h4 className="font-black text-[#4A321F] text-base">{t.title}</h4>
+                            </div>
+                            <p className="text-[12px] font-bold text-slate-500 mt-1.5">{t.desc}</p>
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <button
                       onClick={enterGate}
-                      className={`w-full text-center p-5 rounded-3xl border-2 transition-all cursor-pointer active:scale-98 ${
+                      className={`w-full text-center p-5 rounded-3xl border-2 transition-all cursor-pointer active:scale-98 relative overflow-hidden ${
                         g1DoneCount === 4
-                          ? 'border-amber-400 bg-gradient-to-r from-amber-50 to-orange-50 hover:shadow-md'
+                          ? 'border-amber-400 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 hover:shadow-lg'
                           : 'border-slate-200 bg-slate-50 opacity-70'
                       }`}
                     >
-                      <div className="flex items-center justify-center gap-3">
+                      {g1DoneCount === 4 && (
+                        <span className="absolute inset-0 opacity-30 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 50%, rgba(251,191,36,0.4), transparent 70%)' }} />
+                      )}
+                      <div className="relative flex items-center justify-center gap-3">
                         <span className="text-3xl">{g1DoneCount === 4 ? '🚪' : '🔒'}</span>
                         <div>
-                          <h4 className="font-black text-[#4A321F] text-base">幸福之門</h4>
+                          <h4 className="font-black text-[#4A321F] text-base flex items-center gap-1.5">幸福之門 {g1DoneCount === 4 && <Sparkles className="w-4 h-4 text-amber-500" />}</h4>
                           <p className="text-[12px] font-bold text-slate-500">
                             {g1DoneCount === 4 ? '五把鑰匙已齊，選擇你的行動，開啟屬於你的幸福之門！' : `還需完成 ${4 - g1DoneCount} 項任務才能開啟`}
                           </p>
                         </div>
                       </div>
                     </button>
+
+                    {/* 五把鑰匙收集進度 */}
+                    <div className="bg-[#12225A] rounded-2xl p-4 flex items-center gap-4 flex-wrap">
+                      <span className="text-[11px] font-black text-amber-300 shrink-0">🔑 幸福鑰匙收集進度</span>
+                      {KEY_ORDER.map((k, idx) => {
+                        const taskForKey: G1TaskId[] = ['task1', 'task2', 'task3', 'task4', 'gate'];
+                        const unlocked = g1Done[taskForKey[idx]];
+                        return (
+                          <div key={k} className="flex flex-col items-center gap-1">
+                            <span className={`text-lg ${unlocked ? '' : 'grayscale opacity-40'}`}>🗝️</span>
+                            <span className={`text-[9.5px] font-black ${unlocked ? 'text-amber-200' : 'text-slate-500'}`}>{k}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
