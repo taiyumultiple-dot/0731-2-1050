@@ -116,9 +116,9 @@ interface InteractiveQuestTabProps {
 const GAMES = [
   {
     id: 1,
-    title: '心理測驗 MBTI',
-    description: '探索你的性格類型，了解自己與他人。',
-    emoji: '🧠',
+    title: '生命讀秒：24小時',
+    description: '如果生命只剩 24 小時，你會怎麼分配？召喚屬於你的生命英雄。',
+    emoji: '⏳',
     color: 'bg-[#FFF9F2] border-[#F1E0CE] text-[#C48C46]',
     iconColor: 'text-[#C48C46]',
     number: '01'
@@ -611,234 +611,207 @@ export default function InteractiveQuestTab({
   };
 
   // ----------------------------------------------------
-  // GAME STATE 1: MBTI QUIZ (12 questions, 4 options each, 4 axes)
+  // GAME STATE 1: 生命讀秒 24 小時
+  // (呼應總說單元:一分鐘蒼蠅的時間壓力 + 幸福路上的自我探索 + 五把鑰匙)
+  // 流程: intro(蒼蠅倒數) → allocate(24小時分配) → dialogue(內心對話) → summon(召喚) → result(英雄卡)
   // ----------------------------------------------------
-  const [mbtiStarted, setMbtiStarted] = useState(false);
-  const [mbtiStep, setMbtiStep] = useState(0);
-  const [mbtiAnswers, setMbtiAnswers] = useState<Record<number, string>>({});
-  const [mbtiRevealed, setMbtiRevealed] = useState(false);
+  type LifeKeyId = '哲學思考' | '人學探索' | '終極關懷' | '價值思辨' | '靈性修養';
 
-  const MBTI_OPTION_COLORS = ['bg-sky-500', 'bg-emerald-500', 'bg-orange-500', 'bg-violet-500'];
+  const [g1Stage, setG1Stage] = useState<'intro' | 'allocate' | 'dialogue' | 'summon' | 'result'>('intro');
+  const [g1Chosen, setG1Chosen] = useState<string[]>([]);
+  const [g1DialogueAnswers, setG1DialogueAnswers] = useState<Record<number, number>>({});
+  const [g1DialogueStep, setG1DialogueStep] = useState(0);
 
-  const mbtiQuestions = [
-    { axis: 'EI', q: '參加聚會時，你會比較傾向於？', options: [
-      { label: '主動與不同的人聊天，認識新朋友', val: 'E' },
-      { label: '和熟悉的朋友待在一起，聊天比較自在', val: 'I' },
-      { label: '觀察環境與氣氛，先想清楚再決定要說什麼', val: 'I' },
-      { label: '專注於自己感興趣的事，與他人互動較少', val: 'I' },
-    ]},
-    { axis: 'EI', q: '課堂分組討論時，你通常會？', options: [
-      { label: '率先開口，帶動大家一起發想', val: 'E' },
-      { label: '先聽完大家的意見，再表達自己的想法', val: 'I' },
-      { label: '負責整理紀錄，安靜地把內容寫下來', val: 'I' },
-      { label: '喜歡跟少數幾個熟識的同學一起討論', val: 'E' },
-    ]},
-    { axis: 'EI', q: '放學後，最能讓你放鬆充電的方式是？', options: [
-      { label: '跟一群朋友出去走走、聊天到很晚', val: 'E' },
-      { label: '一個人在房間看書、聽音樂', val: 'I' },
-      { label: '打電動或做自己喜歡的興趣', val: 'I' },
-      { label: '約一兩個知心好友聊心事', val: 'E' },
-    ]},
-    { axis: 'SN', q: '在思考生命意義或未來理想時，你比較相信？', options: [
-      { label: '現實世界與具體經驗，把握當下的實踐', val: 'S' },
-      { label: '內心的直覺、哲學思索與未來的可能性', val: 'N' },
-      { label: '從過去經驗歸納出的實用做法', val: 'S' },
-      { label: '天馬行空的想像與新奇的點子', val: 'N' },
-    ]},
-    { axis: 'SN', q: '老師交代一份報告時，你會先？', options: [
-      { label: '照範例格式，一步步照著做最安心', val: 'S' },
-      { label: '想像各種不同的呈現方式再動手', val: 'N' },
-      { label: '確認清楚每個細節與規定', val: 'S' },
-      { label: '先抓大方向，細節之後再補齊', val: 'N' },
-    ]},
-    { axis: 'SN', q: '你比較容易被什麼樣的故事打動？', options: [
-      { label: '真實發生、貼近生活的故事', val: 'S' },
-      { label: '充滿想像、隱喻深刻的故事', val: 'N' },
-      { label: '有具體數據與細節佐證的故事', val: 'S' },
-      { label: '探索未知、打破框架的故事', val: 'N' },
-    ]},
-    { axis: 'TF', q: '當好朋友遇到重大挫折向你哭訴時，你的第一反應是？', options: [
-      { label: '幫他理性客觀地分析問題，尋求具體方案', val: 'T' },
-      { label: '感同身受他的痛苦，先擁抱並支持他的情緒', val: 'F' },
-      { label: '陪他一起想解決辦法，同時也聽他抒發', val: 'F' },
-      { label: '直接指出問題根源，希望他盡快好起來', val: 'T' },
-    ]},
-    { axis: 'TF', q: '做決定時，你比較重視？', options: [
-      { label: '邏輯是否合理、是否公平一致', val: 'T' },
-      { label: '會不會傷害到重視的人的感受', val: 'F' },
-      { label: '客觀的利弊分析', val: 'T' },
-      { label: '大家的和諧與感受', val: 'F' },
-    ]},
-    { axis: 'TF', q: '同學做錯事被老師誤會時，你會？', options: [
-      { label: '就事論事，先釐清事實再說', val: 'T' },
-      { label: '先安慰同學的情緒，再一起想辦法', val: 'F' },
-      { label: '幫忙分析整件事的來龍去脈', val: 'T' },
-      { label: '同理他當下的委屈與難過', val: 'F' },
-    ]},
-    { axis: 'JP', q: '在規劃暑假或週末的生活作息時，你習慣？', options: [
-      { label: '制定詳細的時間表，按部就班安心執行', val: 'J' },
-      { label: '不預作太多束縛，隨遇而安、享受彈性', val: 'P' },
-      { label: '至少先訂出大原則再視情況調整', val: 'J' },
-      { label: '走到哪算到哪，臨時決定最有趣', val: 'P' },
-    ]},
-    { axis: 'JP', q: '報告截止日前，你通常？', options: [
-      { label: '提早規劃進度，避免臨時趕工', val: 'J' },
-      { label: '靈感來了才動手，效率反而更好', val: 'P' },
-      { label: '列好清單，一項一項打勾完成', val: 'J' },
-      { label: '保留彈性，看心情調整順序', val: 'P' },
-    ]},
-    { axis: 'JP', q: '面對突發的行程改變，你的反應是？', options: [
-      { label: '有點不安，希望盡快恢復原計畫', val: 'J' },
-      { label: '覺得新鮮，順勢調整就好', val: 'P' },
-      { label: '重新排一次時間表才安心', val: 'J' },
-      { label: '正好換個方式，隨機應變', val: 'P' },
-    ]},
-  ];
-
-  const MBTI_GROUP_STYLES: Record<string, string> = {
-    emerald: 'bg-emerald-50 border-emerald-200 text-emerald-700',
-    violet: 'bg-violet-50 border-violet-200 text-violet-700',
-    sky: 'bg-sky-50 border-sky-200 text-sky-700',
-    orange: 'bg-orange-50 border-orange-200 text-orange-700',
-  };
-
-  const MBTI_GROUPS = [
-    { name: '外交家', color: 'emerald', desc: '溫暖友善，重視和諧與人際關係，擁有理想與同理心。', types: 'ENFJ · ENFP · INFJ · INFP' },
-    { name: '分析家', color: 'violet', desc: '理性思考，喜歡探索真理，追求知識與創新。', types: 'INTJ · INTP · ENTJ · ENTP' },
-    { name: '守護者', color: 'sky', desc: '注重守護與實踐，腳踏實地、盡忠職守且值得信賴。', types: 'ISTJ · ISFJ · ESTJ · ESFJ' },
-    { name: '探險家', color: 'orange', desc: '靈活應變，充滿活力，熱愛藝術，享受在當下的體驗。', types: 'ISTP · ISFP · ESTP · ESFP' },
-  ];
-
-  // ----------------------------------------------------
-  // 8 大「生命英雄原型」— 把 16 型 MBTI 結果轉譯成生命教育語言
-  // ----------------------------------------------------
-  interface LifeArchetype {
-    key: string;
-    name: string;
-    emoji: string;
-    tagline: string;
-    desc: string;
-    unit: string;
-    unitDesc: string;
-    from: string; // gradient start (tailwind arbitrary-safe hex)
-    to: string;   // gradient end
-    ring: string; // border/text tailwind classes
-    chip: string; // small badge bg
+  interface LifeCard {
+    id: string; title: string; emoji: string; hours: number;
+    necessary: boolean; meaningful: boolean; key: LifeKeyId | null;
   }
 
-  const ARCHETYPE_BY_CODE: Record<string, string> = {
-    ISTJ: 'guardian', ISFJ: 'guardian',
-    ESTJ: 'navigator', ESFJ: 'navigator',
-    ISTP: 'pathfinder', ESTP: 'pathfinder',
-    ISFP: 'dreamer', ESFP: 'dreamer',
-    INTJ: 'sage', INTP: 'sage',
-    ENTJ: 'strategist', ENTP: 'strategist',
-    INFJ: 'healer', INFP: 'healer',
-    ENFJ: 'inspirer', ENFP: 'inspirer',
-  };
+  const LIFE_CARDS: LifeCard[] = [
+    { id: 'family_meal', title: '陪家人好好吃一頓飯', emoji: '🍚', hours: 2, necessary: false, meaningful: true, key: '終極關懷' },
+    { id: 'reconcile', title: '跟吵架許久的朋友和好', emoji: '🤝', hours: 2, necessary: false, meaningful: true, key: '人學探索' },
+    { id: 'bucket_list', title: '完成一直拖延的心願', emoji: '🎈', hours: 3, necessary: false, meaningful: true, key: '靈性修養' },
+    { id: 'sunrise', title: '去看一次日出', emoji: '🌅', hours: 2, necessary: false, meaningful: true, key: '靈性修養' },
+    { id: 'say_thanks', title: '對重要的人說一句謝謝', emoji: '💌', hours: 1, necessary: false, meaningful: true, key: '終極關懷' },
+    { id: 'alone_time', title: '安靜地跟自己獨處、寫下心情', emoji: '📝', hours: 2, necessary: false, meaningful: true, key: '人學探索' },
+    { id: 'who_am_i', title: '認真想想「我到底想成為什麼樣的人」', emoji: '🧭', hours: 2, necessary: false, meaningful: true, key: '哲學思考' },
+    { id: 'cram', title: '繼續刷題準備明天的考試', emoji: '📚', hours: 4, necessary: true, meaningful: false, key: '價值思辨' },
+    { id: 'reply_boss', title: '回覆老師/教練交代的任務訊息', emoji: '📩', hours: 2, necessary: true, meaningful: false, key: '價值思辨' },
+    { id: 'scroll_phone', title: '滑手機、漫無目的滑社群', emoji: '📱', hours: 3, necessary: false, meaningful: false, key: null },
+    { id: 'chores', title: '打掃房間、處理雜務', emoji: '🧹', hours: 2, necessary: true, meaningful: false, key: null },
+  ];
 
-  const LIFE_ARCHETYPES: Record<string, LifeArchetype> = {
-    guardian: {
-      key: 'guardian', name: '守護者', emoji: '🛡️',
-      tagline: '穩重可靠的生命基石',
-      desc: '你重視承諾與責任，凡事按部就班，是身邊的人最信賴的依靠。就像可華爸爸一樣，習慣用行動而不是言語，默默守護在乎的人。',
-      unit: '終極關懷', unitDesc: '學習在守護他人之餘，也練習好好照顧自己的內心。',
-      from: '#EFF6FF', to: '#DBEAFE', ring: 'border-blue-300 text-blue-700', chip: 'bg-blue-100 text-blue-700'
+  interface InnerDialogueQ {
+    id: string; prompt: string;
+    options: { label: string; key: LifeKeyId }[];
+  }
+
+  const INNER_DIALOGUE: InnerDialogueQ[] = [
+    {
+      id: 'q1',
+      prompt: '大家都說「先考上好大學，以後就會幸福」，但你心裡突然冒出一個念頭：這條路，真的是我要的嗎？',
+      options: [
+        { label: '停下來，重新想想自己真正在乎的是什麼', key: '哲學思考' },
+        { label: '先觀察身邊的人，看看他們的選擇與心情', key: '人學探索' },
+        { label: '想到「人生終究會結束」，才更該想清楚方向', key: '終極關懷' },
+        { label: '把這條路和其他可能性攤開來比較利弊', key: '價值思辨' },
+      ]
     },
-    navigator: {
-      key: 'navigator', name: '領航家', emoji: '🧭',
-      tagline: '帶領大家前進的班長魂',
-      desc: '你天生具備組織與領導特質，習慣把事情安排得井井有條，樂於帶著大家一起把目標完成。',
-      unit: '價值思辨', unitDesc: '練習在領導與決策時，也留意並聽見不同的聲音。',
-      from: '#FFF7ED', to: '#FFEDD5', ring: 'border-orange-300 text-orange-700', chip: 'bg-orange-100 text-orange-700'
+    {
+      id: 'q2',
+      prompt: '（呼應《幸福路上》）小琪長大後，終於問自己：「我是誰？我從哪裡來？」你也試著問問自己，你會先從哪裡開始找答案？',
+      options: [
+        { label: '回顧自己走過的路，那些形塑我的經驗', key: '人學探索' },
+        { label: '安靜下來，向內感受此刻真實的自己', key: '靈性修養' },
+        { label: '思考「自我」這個概念本身是什麼意思', key: '哲學思考' },
+        { label: '想想自己一直以來最珍惜、最捨不得的是什麼', key: '終極關懷' },
+      ]
     },
-    pathfinder: {
-      key: 'pathfinder', name: '拓荒者', emoji: '⚡',
-      tagline: '說做就做的行動實踐家',
-      desc: '你喜歡動手嘗試、活在當下，遇到問題總能靈活應變，是不畏懼冒險的行動派。',
-      unit: '哲學思考', unitDesc: '在快速行動之餘，也練習停下來，多想一步再出發。',
-      from: '#FEFCE8', to: '#FEF9C3', ring: 'border-yellow-400 text-yellow-700', chip: 'bg-yellow-100 text-yellow-700'
+    {
+      id: 'q3',
+      prompt: '身邊的人都期待你走某一條路，但那不完全是你想要的。你會怎麼面對這份「被期待」的壓力？',
+      options: [
+        { label: '誠實表達自己的想法，即使可能讓人失望', key: '價值思辨' },
+        { label: '找時間跟自己獨處，先安頓好內心再決定', key: '靈性修養' },
+        { label: '試著理解對方期待背後真正的擔心是什麼', key: '人學探索' },
+        { label: '把選擇放回「什麼才是我要的幸福」這個問題上', key: '哲學思考' },
+      ]
     },
-    dreamer: {
-      key: 'dreamer', name: '造夢師', emoji: '🎨',
-      tagline: '用感受為世界上色的人',
-      desc: '你擁有豐富的感受力與美感，總能用自己的方式為周遭增添色彩，珍惜當下的每個瞬間。',
-      unit: '靈性修養', unitDesc: '透過創作與感受力，持續探索內在的成長與卓越。',
-      from: '#FDF2F8', to: '#FCE7F3', ring: 'border-pink-300 text-pink-700', chip: 'bg-pink-100 text-pink-700'
-    },
-    sage: {
-      key: 'sage', name: '智者', emoji: '🔭',
-      tagline: '追根究柢的真理探求者',
-      desc: '你熱愛探索事物背後的原理，喜歡獨立思考、追根究柢，像小文一樣對世界的奧秘充滿好奇。',
-      unit: '哲學思考', unitDesc: '善用批判思考的能力，練習理性與邏輯的思辨方法。',
+    {
+      id: 'q4',
+      prompt: '（呼應一分鐘蒼蠅）時間不斷倒數，如果只剩很少時間，你最想先確認的一件事是什麼？',
+      options: [
+        { label: '我有沒有好好愛過、陪伴過重要的人', key: '終極關懷' },
+        { label: '我有沒有誠實面對過真正的自己', key: '靈性修養' },
+        { label: '我做的選擇，是不是符合我真正相信的價值', key: '價值思辨' },
+        { label: '我對「活著」這件事，是不是想得夠清楚', key: '哲學思考' },
+      ]
+    }
+  ];
+
+  const KEY_ORDER: LifeKeyId[] = ['哲學思考', '人學探索', '終極關懷', '價值思辨', '靈性修養'];
+
+  const KEY_ARCHETYPES: Record<LifeKeyId, {
+    name: string; emoji: string; tagline: string; desc: string; unitDesc: string;
+    from: string; to: string; ring: string; chip: string;
+  }> = {
+    '哲學思考': {
+      name: '智者', emoji: '🔭', tagline: '追根究柢的真理探求者',
+      desc: '你習慣停下來多想一步，不急著把「大家都這樣走」的路當成唯一答案。你相信，想清楚「為什麼」比急著「做什麼」更重要。',
+      unitDesc: '善用批判思考的能力，練習理性與邏輯的思辨方法。',
       from: '#F5F3FF', to: '#EDE9FE', ring: 'border-violet-300 text-violet-700', chip: 'bg-violet-100 text-violet-700'
     },
-    strategist: {
-      key: 'strategist', name: '戰略家', emoji: '♟️',
-      tagline: '勇於挑戰現狀的提案人',
-      desc: '你善於分析局勢、勇於挑戰既有框架，總能提出讓人眼睛一亮的新想法。',
-      unit: '價值思辨', unitDesc: '在辯證與挑戰之中，練習真理越辯越明的智慧。',
-      from: '#FEF2F2', to: '#FEE2E2', ring: 'border-red-300 text-red-700', chip: 'bg-red-100 text-red-700'
-    },
-    healer: {
-      key: 'healer', name: '療癒者', emoji: '🌙',
-      tagline: '溫柔接住情緒的傾聽者',
-      desc: '你擁有細膩的內心世界與強烈的同理心，總能察覺他人未說出口的情緒，是最溫柔的陪伴者。',
-      unit: '終極關懷', unitDesc: '練習用愛與勇氣，陪自己也陪別人面對生命的課題。',
-      from: '#EEF2FF', to: '#E0E7FF', ring: 'border-indigo-300 text-indigo-700', chip: 'bg-indigo-100 text-indigo-700'
-    },
-    inspirer: {
-      key: 'inspirer', name: '鼓舞家', emoji: '✨',
-      tagline: '散發溫暖與希望的太陽',
-      desc: '你天生的感染力能鼓舞身邊每一個人，像博鈞和曉萍一樣，總在人群中散發溫暖與希望。',
-      unit: '人學探索', unitDesc: '在你我他交織的生命網絡中，發揮你最擅長的正向影響力。',
+    '人學探索': {
+      name: '觀察家', emoji: '👁️', tagline: '細膩看見人我之間的探索者',
+      desc: '你擅長從關係與經驗裡認識自己，也願意花時間去理解身邊的人。對你來說，「我是誰」的答案，往往藏在人與人之間。',
+      unitDesc: '在你我他交織的生命網絡中，持續探索自我與他人的連結。',
       from: '#F0FDF4', to: '#DCFCE7', ring: 'border-emerald-300 text-emerald-700', chip: 'bg-emerald-100 text-emerald-700'
     },
+    '終極關懷': {
+      name: '療癒者', emoji: '🌙', tagline: '溫柔面對生死與意義的人',
+      desc: '你對生命的有限特別有感，也因此更珍惜眼前重要的人。你相信，好好道謝、好好陪伴，才是不留遺憾的關鍵。',
+      unitDesc: '練習用愛與勇氣，陪自己也陪別人面對生命的課題。',
+      from: '#EEF2FF', to: '#E0E7FF', ring: 'border-indigo-300 text-indigo-700', chip: 'bg-indigo-100 text-indigo-700'
+    },
+    '價值思辨': {
+      name: '戰略家', emoji: '♟️', tagline: '在兩難之中做出抉擇的思辨者',
+      desc: '你不會盲目跟隨單一的「成功公式」，習慣把不同的選項攤開來比較，想清楚自己真正相信的價值排序。',
+      unitDesc: '在辯證與挑戰之中，練習真理越辯越明的智慧。',
+      from: '#FEF2F2', to: '#FEE2E2', ring: 'border-red-300 text-red-700', chip: 'bg-red-100 text-red-700'
+    },
+    '靈性修養': {
+      name: '修行者', emoji: '🕊️', tagline: '安頓內心、持續成長的人',
+      desc: '你重視與自己獨處的時刻，不急著用忙碌填滿生活。對你而言，內心的安定，是幸福最重要的地基。',
+      unitDesc: '透過覺察與內省，持續探索內在的成長與卓越。',
+      from: '#FDF2F8', to: '#FCE7F3', ring: 'border-pink-300 text-pink-700', chip: 'bg-pink-100 text-pink-700'
+    },
   };
 
-  const getLifeArchetype = (): LifeArchetype => {
-    const code = getMbtiResult();
-    const key = ARCHETYPE_BY_CODE[code] || 'guardian';
-    return LIFE_ARCHETYPES[key];
+  const g1TotalHours = 24;
+  const g1UsedHours = g1Chosen.reduce((sum, id) => sum + (LIFE_CARDS.find(c => c.id === id)?.hours || 0), 0);
+  const g1RemainingHours = g1TotalHours - g1UsedHours;
+
+  const toggleLifeCard = (id: string) => {
+    const card = LIFE_CARDS.find(c => c.id === id);
+    if (!card) return;
+    setG1Chosen(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id);
+      if (g1UsedHours + card.hours > g1TotalHours) {
+        showToast('⏰ 時間不夠了！24 小時已經分配得差不多囉');
+        return prev;
+      }
+      return [...prev, id];
+    });
   };
 
-  const handleMbtiAnswer = (val: string) => {
-    const nextAnswers = { ...mbtiAnswers, [mbtiStep]: val };
-    setMbtiAnswers(nextAnswers);
-    const nextStep = mbtiStep + 1;
-    setMbtiStep(nextStep);
-    if (nextStep >= mbtiQuestions.length) {
-      saveGameResult('mbti', { answers: nextAnswers });
-      setMbtiRevealed(false);
-      showToast('🎉 覺醒測驗完成！準備召喚你的生命英雄...');
+  const finishAllocation = () => {
+    if (g1Chosen.length < 3) {
+      showToast('⏳ 再多選幾項吧，想想這 24 小時你真正想做的事！');
+      return;
+    }
+    setG1Stage('dialogue');
+  };
+
+  const handleDialogueAnswer = (optIdx: number) => {
+    const nextAnswers = { ...g1DialogueAnswers, [g1DialogueStep]: optIdx };
+    setG1DialogueAnswers(nextAnswers);
+    const nextStep = g1DialogueStep + 1;
+    setG1DialogueStep(nextStep);
+    if (nextStep >= INNER_DIALOGUE.length) {
+      setG1Stage('summon');
     }
   };
 
-  const mbtiAxisPercent = (leftChar: string, rightChar: string): number => {
-    const relevantQuestions = mbtiQuestions.filter(q => q.axis === leftChar + rightChar || q.axis === rightChar + leftChar);
-    if (relevantQuestions.length === 0) return 50;
-    let leftCount = 0;
-    relevantQuestions.forEach((q) => {
-      const originalIdx = mbtiQuestions.indexOf(q);
-      const ans = mbtiAnswers[originalIdx];
-      if (ans === leftChar) leftCount++;
+  const getKeyScores = (): Record<LifeKeyId, number> => {
+    const scores: Record<LifeKeyId, number> = { '哲學思考': 0, '人學探索': 0, '終極關懷': 0, '價值思辨': 0, '靈性修養': 0 };
+    g1Chosen.forEach(id => {
+      const card = LIFE_CARDS.find(c => c.id === id);
+      if (card?.key && card.meaningful) scores[card.key] += card.hours;
     });
-    return Math.round((leftCount / relevantQuestions.length) * 100);
+    INNER_DIALOGUE.forEach((q, idx) => {
+      const optIdx = g1DialogueAnswers[idx];
+      if (optIdx !== undefined && q.options[optIdx]) {
+        scores[q.options[optIdx].key] += 3;
+      }
+    });
+    return scores;
   };
 
-  const getMbtiResult = (): string => {
-    const E = mbtiAxisPercent('E', 'I') >= 50 ? 'E' : 'I';
-    const S = mbtiAxisPercent('S', 'N') >= 50 ? 'S' : 'N';
-    const T = mbtiAxisPercent('T', 'F') >= 50 ? 'T' : 'F';
-    const J = mbtiAxisPercent('J', 'P') >= 50 ? 'J' : 'P';
-    return `${E}${S}${T}${J}`;
+  const getTopKey = (): LifeKeyId => {
+    const scores = getKeyScores();
+    let top: LifeKeyId = KEY_ORDER[0];
+    let max = -1;
+    KEY_ORDER.forEach(k => { if (scores[k] > max) { max = scores[k]; top = k; } });
+    return top;
   };
 
-  const resetMbti = () => {
-    setMbtiStep(0);
-    setMbtiAnswers({});
-    setMbtiStarted(false);
-    setMbtiRevealed(false);
+  const getAwarenessIndex = (): number => {
+    if (g1Chosen.length === 0) return 0;
+    const meaningfulCount = g1Chosen.filter(id => LIFE_CARDS.find(c => c.id === id)?.meaningful).length;
+    return Math.round((meaningfulCount / g1Chosen.length) * 100);
+  };
+
+  const revealG1Result = () => {
+    const scores = getKeyScores();
+    const topKey = getTopKey();
+    const awareness = getAwarenessIndex();
+    saveGameResult('mbti', {
+      chosenCards: g1Chosen,
+      dialogueAnswers: g1DialogueAnswers,
+      keyScores: scores,
+      topKey,
+      topKeyLabel: topKey,
+      awarenessIndex: awareness,
+    });
+    setG1Stage('result');
+    showToast('🎉 你的生命英雄已經覺醒！');
+  };
+
+  const resetG1 = () => {
+    setG1Stage('intro');
+    setG1Chosen([]);
+    setG1DialogueAnswers({});
+    setG1DialogueStep(0);
   };
 
   // ----------------------------------------------------
@@ -1326,14 +1299,14 @@ export default function InteractiveQuestTab({
     if (currentStudent?.studentId) {
       const mySub = submissions.find(s => s.studentId === currentStudent.studentId);
       if (mySub && mySub.games) {
-        // Game 1: MBTI
+        // Game 1: 生命讀秒 24 小時
         if (mySub.games['game_mbti']?.data) {
-          const mbtiData = mySub.games['game_mbti'].data;
-          if (mbtiData.answers && Object.keys(mbtiData.answers).length > 0) {
-            setMbtiAnswers(mbtiData.answers);
-            setMbtiStarted(true);
-            setMbtiStep(mbtiQuestions.length); // Direct jump to results view
-            setMbtiRevealed(true); // Already revealed in a previous session
+          const g1Data = mySub.games['game_mbti'].data;
+          if (g1Data.chosenCards && g1Data.chosenCards.length > 0) {
+            setG1Chosen(g1Data.chosenCards);
+            setG1DialogueAnswers(g1Data.dialogueAnswers || {});
+            setG1DialogueStep(INNER_DIALOGUE.length);
+            setG1Stage('result');
           }
         }
         // Game 2: Puzzle Map
@@ -2122,7 +2095,7 @@ export default function InteractiveQuestTab({
             </div>
 
             {/* ------------------------------------------------------------------------------------------------- */}
-            {/* GAME VIEW 1: MBTI QUIZ */}
+            {/* GAME VIEW 1: 生命讀秒 24 小時 */}
             {/* ------------------------------------------------------------------------------------------------- */}
             {activeGameId === 1 && (
               <div id="game-view-mbti" className="space-y-6">
@@ -2133,8 +2106,8 @@ export default function InteractiveQuestTab({
                   <div className="flex items-center gap-5 z-10">
                     <div className="w-16 h-16 rounded-full bg-[#E65100] text-white flex items-center justify-center text-2xl font-black font-mono shrink-0 shadow-md">01</div>
                     <div className="space-y-1 text-left">
-                      <h2 className="text-2xl md:text-3xl font-black text-[#4A321F] flex items-center gap-2">生命英雄覺醒 <Wand2 className="w-5 h-5 text-[#E0812A]" /></h2>
-                      <p className="text-xs md:text-sm font-bold text-[#7D5C43]/90">回答覺醒抉擇，召喚屬於你的生命英雄原型！</p>
+                      <h2 className="text-2xl md:text-3xl font-black text-[#4A321F] flex items-center gap-2">生命讀秒：24 小時 <Timer className="w-5 h-5 text-[#E0812A]" /></h2>
+                      <p className="text-xs md:text-sm font-bold text-[#7D5C43]/90">如果生命只剩 24 小時，你會怎麼分配？在抉擇中召喚你的生命英雄。</p>
                     </div>
                   </div>
                   <div className="hidden md:flex items-center z-10 shrink-0 pr-2">
@@ -2142,99 +2115,119 @@ export default function InteractiveQuestTab({
                   </div>
                 </div>
 
-                {!mbtiStarted ? (
-                  /* ---------- LANDING SUB-VIEW ---------- */
-                  <div className="space-y-6">
-                    <div className="relative overflow-hidden bg-gradient-to-br from-[#1B1230] via-[#241938] to-[#150E24] border-2 border-[#4A3A6B] rounded-3xl p-6 shadow-lg space-y-4 text-left">
-                      <div className="absolute -top-10 -right-10 w-40 h-40 bg-amber-400/20 rounded-full blur-3xl pointer-events-none" />
-                      <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-violet-400/20 rounded-full blur-3xl pointer-events-none" />
-                      <h3 className="font-black text-amber-300 text-sm flex items-center gap-2 relative z-10">
-                        <Star className="w-4 h-4 fill-amber-300" /><span>英雄圖鑑・8 種生命原型</span>
-                      </h3>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10">
-                        {Object.values(LIFE_ARCHETYPES).map((a) => (
-                          <div key={a.key} className="rounded-2xl border border-white/15 bg-white/5 backdrop-blur-sm p-3.5 text-center hover:bg-white/10 hover:border-amber-300/50 transition-all">
-                            <div className="text-3xl mb-1.5">{a.emoji}</div>
-                            <div className="text-xs font-black text-white">{a.name}</div>
-                            <div className="text-[10.5px] font-bold text-white/50 mt-0.5 leading-snug">{a.tagline}</div>
-                          </div>
-                        ))}
+                {g1Stage === 'intro' && (
+                  /* ---------- STAGE 0: 蒼蠅倒數引導 ---------- */
+                  <div className="relative overflow-hidden bg-gradient-to-br from-[#1B1230] via-[#241938] to-[#150E24] border-2 border-[#4A3A6B] rounded-3xl p-10 shadow-lg text-center space-y-6">
+                    <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 40%, rgba(251,191,36,0.25), transparent 60%)' }} />
+                    <motion.div
+                      animate={{ y: [0, -10, 0], x: [0, 6, -6, 0] }}
+                      transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
+                      className="relative z-10 text-6xl"
+                    >
+                      🪰
+                    </motion.div>
+                    <div className="relative z-10 text-5xl font-black text-amber-300 font-mono tracking-wider animate-pulse">24:00:00</div>
+                    <div className="relative z-10 space-y-2 max-w-md mx-auto">
+                      <h3 className="text-lg font-black text-white">如果生命只剩 24 小時，你會怎麼過？</h3>
+                      <p className="text-xs font-bold text-white/50 leading-relaxed">呼應《一分鐘蒼蠅》的時間倒數 —— 生命中「必要」的事，不一定是「重要」的事。這次的抉擇，沒有人會告訴你答案。</p>
+                    </div>
+                    <button
+                      onClick={() => setG1Stage('allocate')}
+                      className="relative z-10 px-8 py-3 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-[#3B2107] font-black text-sm rounded-2xl shadow-lg transition-all cursor-pointer active:scale-95 flex items-center gap-2 mx-auto"
+                    >
+                      <Sparkles className="w-4 h-4" /> 開始分配我的 24 小時
+                    </button>
+                  </div>
+                )}
+
+                {g1Stage === 'allocate' && (
+                  /* ---------- STAGE 1: 24 小時資源分配 ---------- */
+                  <div className="space-y-4">
+                    <div className="bg-white border-2 border-[#EAD5C3] rounded-3xl p-5 shadow-sm flex items-center gap-4">
+                      <div
+                        className="w-16 h-16 rounded-full shrink-0 flex items-center justify-center"
+                        style={{ background: `conic-gradient(#E65100 ${(g1UsedHours / g1TotalHours) * 100}%, #EAD5C3 0)` }}
+                      >
+                        <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-[11px] font-black text-[#4A321F] text-center leading-tight">
+                          剩<br />{g1RemainingHours}h
+                        </div>
                       </div>
-                      <p className="text-[11.5px] font-bold text-white/40 relative z-10">✦ 完成覺醒測驗，看看你會召喚出哪一位生命英雄！</p>
+                      <div className="flex-1">
+                        <h4 className="font-black text-[#4A321F] text-sm">選出你想用這 24 小時做的事</h4>
+                        <p className="text-[12px] font-bold text-slate-400">點擊卡片加入 / 移除，時間到了就送出（至少選 3 項）</p>
+                      </div>
+                      <button
+                        onClick={finishAllocation}
+                        className="px-5 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white font-black text-xs rounded-xl shadow-sm transition-all cursor-pointer active:scale-98 shrink-0"
+                      >
+                        送出分配 →
+                      </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
-                      <div className="bg-[#FFFDF9] border-2 border-[#EAD5C3] rounded-3xl p-5 flex items-start gap-3 text-left shadow-xs">
-                        <img src={charDadImg} alt="可華爸爸" className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-sm shrink-0" referrerPolicy="no-referrer" />
-                        <div>
-                          <h5 className="font-black text-xs text-slate-800 mb-1">可華爸爸的小叮嚀</h5>
-                          <p className="text-[12.5px] text-slate-500 font-bold leading-relaxed">每一種性格都有獨特的價值，了解自己，才能更自在地發揮優勢，與他人相互欣賞。</p>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => setMbtiStarted(true)}
-                        className="bg-[#E65100] hover:bg-[#D84315] text-white rounded-3xl p-6 flex flex-col items-center justify-center gap-2 shadow-md transition-all cursor-pointer active:scale-98"
-                      >
-                        <span className="flex items-center gap-2 text-base font-black"><Sparkles className="w-5 h-5" /> 開始覺醒測驗</span>
-                        <span className="text-[12.5px] font-bold text-orange-100">準備好了嗎？讓我們召喚真實的你！</span>
-                      </button>
-
-                      <div className="bg-[#FFFDF9] border-2 border-[#EAD5C3] rounded-3xl p-5 flex items-start gap-3 text-left shadow-xs">
-                        <img src={charGrandpaImg} alt="可華爺爺" className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-sm shrink-0" referrerPolicy="no-referrer" />
-                        <div>
-                          <h5 className="font-black text-xs text-slate-800 mb-1">可華爺爺的鼓勵</h5>
-                          <p className="text-[12.5px] text-slate-500 font-bold leading-relaxed">人生是一場美麗的旅程，認識自己，你會發現更想成為那個自己。</p>
-                        </div>
-                      </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {LIFE_CARDS.map((card) => {
+                        const isChosen = g1Chosen.includes(card.id);
+                        return (
+                          <button
+                            key={card.id}
+                            onClick={() => toggleLifeCard(card.id)}
+                            className={`text-left p-4 rounded-2xl border-2 transition-all cursor-pointer active:scale-98 ${
+                              isChosen
+                                ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-200 shadow-sm'
+                                : 'border-[#F1E0CE] bg-white hover:border-orange-200'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-2xl">{card.emoji}</span>
+                              <span className="text-[11px] font-black text-[#B4570B] bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-full shrink-0">{card.hours} 小時</span>
+                            </div>
+                            <p className="text-xs font-black text-[#4A321F] mt-2 leading-snug">{card.title}</p>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
-                ) : mbtiStep < mbtiQuestions.length ? (
-                  /* ---------- QUIZ SUB-VIEW ---------- */
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                )}
 
-                    {/* Left: Progress donut + tips */}
+                {g1Stage === 'dialogue' && (
+                  /* ---------- STAGE 2: 內心對話 (呼應幸福路上) ---------- */
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                     <div className="lg:col-span-3 space-y-4">
                       <div className="bg-[#FCFAF7] border-2 border-[#EAD5C3] rounded-3xl p-5 shadow-xs text-left">
                         <h4 className="font-black text-[#4A321F] text-xs pb-2 mb-3.5 flex items-center gap-1.5">
-                          <TrendingUp className="w-3.5 h-3.5 text-[#E65100]" /><span>測驗進度</span>
+                          <TrendingUp className="w-3.5 h-3.5 text-[#E65100]" /><span>對話進度</span>
                         </h4>
                         <div className="flex items-center gap-3">
                           <div
                             className="w-16 h-16 rounded-full shrink-0 flex items-center justify-center"
-                            style={{ background: `conic-gradient(#E65100 ${(Object.keys(mbtiAnswers).length / mbtiQuestions.length) * 100}%, #EAD5C3 0)` }}
+                            style={{ background: `conic-gradient(#E65100 ${(g1DialogueStep / INNER_DIALOGUE.length) * 100}%, #EAD5C3 0)` }}
                           >
                             <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-[12.5px] font-black text-[#4A321F]">
-                              {Object.keys(mbtiAnswers).length}/{mbtiQuestions.length}
+                              {g1DialogueStep}/{INNER_DIALOGUE.length}
                             </div>
                           </div>
-                          <p className="text-[12.5px] font-bold text-slate-500 leading-relaxed">繼續作答，探索最真實的自己！</p>
+                          <p className="text-[12.5px] font-bold text-slate-500 leading-relaxed">跟自己誠實對話，沒有標準答案。</p>
                         </div>
                       </div>
                       <div className="bg-[#FFFDF9] border-2 border-[#EAD5C3] rounded-3xl p-5 shadow-xs text-left space-y-2">
-                        <h4 className="font-black text-[#4A321F] text-xs flex items-center gap-1.5">💡 測驗小提醒</h4>
-                        <ul className="text-[12.5px] font-bold text-slate-500 leading-relaxed space-y-1 list-disc list-inside">
-                          <li>依直覺作答，不用想太久</li>
-                          <li>沒有對錯，誠實最重要</li>
-                          <li>約需 8-10 分鐘完成測驗</li>
-                        </ul>
+                        <h4 className="font-black text-[#4A321F] text-xs flex items-center gap-1.5">💭 小提醒</h4>
+                        <p className="text-[12.5px] font-bold text-slate-500 leading-relaxed">憑直覺選擇最貼近你此刻心情的答案，就像《幸福路上》的小琪一樣，慢慢認識自己。</p>
                       </div>
                     </div>
 
-                    {/* Middle: Question */}
-                    <div className="lg:col-span-6 bg-white border-2 border-[#EAD5C3] rounded-3xl p-6 shadow-sm text-left">
+                    <div className="lg:col-span-9 bg-white border-2 border-[#EAD5C3] rounded-3xl p-6 shadow-sm text-left">
                       <div className="flex justify-between items-center border-b-2 border-[#F1E0CE]/60 pb-3 mb-4">
-                        <span className="text-xs font-black text-slate-500 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg">第 {mbtiStep + 1} 題 / 共 {mbtiQuestions.length} 題</span>
+                        <span className="text-xs font-black text-slate-500 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg">第 {g1DialogueStep + 1} 題 / 共 {INNER_DIALOGUE.length} 題</span>
                       </div>
-                      <h3 className="text-base font-black text-[#4A321F] leading-relaxed mb-4">{mbtiQuestions[mbtiStep].q}</h3>
+                      <h3 className="text-base font-black text-[#4A321F] leading-relaxed mb-4">{INNER_DIALOGUE[g1DialogueStep].prompt}</h3>
                       <div className="space-y-3">
-                        {mbtiQuestions[mbtiStep].options.map((opt, idx) => (
+                        {INNER_DIALOGUE[g1DialogueStep].options.map((opt, idx) => (
                           <button
                             key={idx}
-                            onClick={() => handleMbtiAnswer(opt.val)}
+                            onClick={() => handleDialogueAnswer(idx)}
                             className="w-full text-left p-3.5 rounded-2xl border-2 border-[#F1E0CE] hover:border-[#E65100] hover:bg-orange-50/50 transition-all shadow-xs cursor-pointer flex items-center gap-3 group active:scale-98"
                           >
-                            <span className={`w-7 h-7 rounded-full ${MBTI_OPTION_COLORS[idx]} text-white text-xs font-black flex items-center justify-center shrink-0`}>
+                            <span className="w-7 h-7 rounded-full bg-slate-400 text-white text-xs font-black flex items-center justify-center shrink-0">
                               {String.fromCharCode(65 + idx)}
                             </span>
                             <span className="text-xs font-black text-[#4A321F] group-hover:text-[#E65100]">{opt.label}</span>
@@ -2242,32 +2235,11 @@ export default function InteractiveQuestTab({
                         ))}
                       </div>
                     </div>
-
-                    {/* Right: Tendency bars */}
-                    <div className="lg:col-span-3 bg-[#FCFAF7] border-2 border-[#EAD5C3] rounded-3xl p-5 shadow-xs text-left space-y-4">
-                      <h4 className="font-black text-[#4A321F] text-xs flex items-center gap-1.5">🎁 你的傾向</h4>
-                      {[
-                        { axis: 'EI', a: 'E', b: 'I', la: '外向', lb: '內向' },
-                        { axis: 'SN', a: 'S', b: 'N', la: '感覺', lb: '直覺' },
-                        { axis: 'TF', a: 'T', b: 'F', la: '思考', lb: '情感' },
-                        { axis: 'JP', a: 'J', b: 'P', la: '判斷', lb: '知覺' },
-                      ].map((row) => (
-                        <div key={row.axis} className="space-y-1">
-                          <div className="flex justify-between text-[12.5px] font-black text-[#7D6B5D]">
-                            <span>{row.la} {row.a}</span>
-                            <span>{row.lb} {row.b}</span>
-                          </div>
-                          <div className="w-full h-2.5 bg-white border border-[#EAD5C3] rounded-full overflow-hidden flex">
-                            <div className="bg-[#E65100] transition-all duration-500" style={{ width: `${mbtiAxisPercent(row.axis, row.a)}%` }} />
-                            <div className="bg-slate-300 transition-all duration-500" style={{ width: `${100 - mbtiAxisPercent(row.axis, row.a)}%` }} />
-                          </div>
-                        </div>
-                      ))}
-                      <p className="text-[12px] font-bold text-[#B4570B] pt-1">✨ 完成更多題目，結果會更準確喔！</p>
-                    </div>
                   </div>
-                ) : !mbtiRevealed ? (
-                  /* ---------- SUMMON SUB-VIEW (抽卡召喚動畫) ---------- */
+                )}
+
+                {g1Stage === 'summon' && (
+                  /* ---------- STAGE 3: 召喚動畫 ---------- */
                   <div className="relative overflow-hidden bg-gradient-to-br from-[#1B1230] via-[#241938] to-[#150E24] border-2 border-[#4A3A6B] rounded-3xl p-10 shadow-lg text-center space-y-6">
                     <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 40%, rgba(251,191,36,0.35), transparent 60%)' }} />
                     <motion.div
@@ -2279,77 +2251,81 @@ export default function InteractiveQuestTab({
                     </motion.div>
                     <div className="relative z-10 space-y-1.5">
                       <h3 className="text-lg font-black text-amber-300">你的生命英雄即將覺醒...</h3>
-                      <p className="text-xs font-bold text-white/50">點擊卡牌，召喚屬於你的專屬生命原型！</p>
+                      <p className="text-xs font-bold text-white/50">根據你的 24 小時分配與內心對話，點擊召喚屬於你的生命原型！</p>
                     </div>
                     <button
-                      onClick={() => setMbtiRevealed(true)}
+                      onClick={revealG1Result}
                       className="relative z-10 px-8 py-3 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-[#3B2107] font-black text-sm rounded-2xl shadow-lg transition-all cursor-pointer active:scale-95 flex items-center gap-2 mx-auto"
                     >
                       <Sparkles className="w-4 h-4" /> 點擊召喚生命英雄
                     </button>
                   </div>
-                ) : (
-                  /* ---------- RESULT SUB-VIEW (英雄結果卡 + 屬性雷達圖) ---------- */
-                  (() => {
-                    const hero = getLifeArchetype();
-                    const heroTextColor = hero.ring.split(' ')[1];
-                    const statData = [
-                      { stat: '勇氣', value: mbtiAxisPercent('E', 'I') },
-                      { stat: '智慧', value: mbtiAxisPercent('N', 'S') },
-                      { stat: '同理心', value: mbtiAxisPercent('F', 'T') },
-                      { stat: '責任感', value: mbtiAxisPercent('J', 'P') },
-                    ];
-                    return (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.85 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.45, ease: 'easeOut' }}
-                        className={`relative overflow-hidden rounded-3xl border-2 p-8 shadow-lg text-center space-y-6 ${hero.ring.split(' ')[0]}`}
-                        style={{ background: `linear-gradient(135deg, ${hero.from}, ${hero.to})` }}
-                      >
-                        <div className="flex justify-center gap-1">
-                          {[...Array(5)].map((_, i) => (
-                            <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
-                          ))}
-                        </div>
-                        <div className={`inline-flex text-[11px] font-black px-3 py-1 rounded-full ${hero.chip}`}>傳說級 SSR</div>
-                        <div className="text-7xl">{hero.emoji}</div>
-                        <div className="space-y-1">
-                          <h3 className={`text-3xl font-black ${heroTextColor}`}>{hero.name}</h3>
-                          <p className="text-xs font-bold text-slate-500">{hero.tagline}</p>
-                          <p className="text-[10.5px] font-bold text-slate-400 font-mono tracking-widest">{getMbtiResult()}</p>
-                        </div>
-                        <p className="text-xs text-slate-600 leading-relaxed max-w-md mx-auto font-bold bg-white/60 p-4 rounded-xl border border-white/80 text-left">
-                          {hero.desc}
-                        </p>
-
-                        <div className="bg-white/70 rounded-2xl p-3 border border-white/80 max-w-sm mx-auto">
-                          <h5 className="font-black text-[11px] text-slate-500 mb-1 flex items-center justify-center gap-1"><TrendingUp className="w-3.5 h-3.5" /> 屬性面板</h5>
-                          <ResponsiveContainer width="100%" height={220}>
-                            <RadarChart data={statData}>
-                              <PolarGrid stroke="#E5D5C0" />
-                              <PolarAngleAxis dataKey="stat" tick={{ fontSize: 11, fontWeight: 700, fill: '#7D5C43' }} />
-                              <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
-                              <Radar dataKey="value" stroke="#E0812A" fill="#E0812A" fillOpacity={0.45} />
-                            </RadarChart>
-                          </ResponsiveContainer>
-                        </div>
-
-                        <div className="bg-white/70 rounded-2xl p-4 border border-white/80 text-left max-w-md mx-auto">
-                          <h5 className="font-black text-xs text-slate-700 mb-1">🎯 推薦探索單元：{hero.unit}</h5>
-                          <p className="text-[12px] font-bold text-slate-500 leading-relaxed">{hero.unitDesc}</p>
-                        </div>
-
-                        <button
-                          onClick={resetMbti}
-                          className="px-6 py-2 border-2 border-white/70 bg-white/50 text-slate-600 font-black text-xs rounded-xl hover:bg-white/80 transition-all cursor-pointer shadow-xs active:scale-98"
-                        >
-                          重新覺醒
-                        </button>
-                      </motion.div>
-                    );
-                  })()
                 )}
+
+                {g1Stage === 'result' && (() => {
+                  /* ---------- STAGE 4: 英雄結果卡 + 五把鑰匙雷達圖 ---------- */
+                  const topKey = getTopKey();
+                  const hero = KEY_ARCHETYPES[topKey];
+                  const heroTextColor = hero.ring.split(' ')[1];
+                  const scores = getKeyScores();
+                  const maxScore = Math.max(1, ...KEY_ORDER.map(k => scores[k]));
+                  const statData = KEY_ORDER.map(k => ({ stat: k, value: Math.round((scores[k] / maxScore) * 100) }));
+                  const awareness = getAwarenessIndex();
+                  return (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.85 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.45, ease: 'easeOut' }}
+                      className={`relative overflow-hidden rounded-3xl border-2 p-8 shadow-lg text-center space-y-6 ${hero.ring.split(' ')[0]}`}
+                      style={{ background: `linear-gradient(135deg, ${hero.from}, ${hero.to})` }}
+                    >
+                      <div className="flex justify-center gap-1">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                        ))}
+                      </div>
+                      <div className={`inline-flex text-[11px] font-black px-3 py-1 rounded-full ${hero.chip}`}>傳說級 SSR</div>
+                      <div className="text-7xl">{hero.emoji}</div>
+                      <div className="space-y-1">
+                        <h3 className={`text-3xl font-black ${heroTextColor}`}>{hero.name}</h3>
+                        <p className="text-xs font-bold text-slate-500">{hero.tagline}</p>
+                        <p className="text-[10.5px] font-bold text-slate-400 font-mono tracking-widest">最重視：{topKey}</p>
+                      </div>
+                      <p className="text-xs text-slate-600 leading-relaxed max-w-md mx-auto font-bold bg-white/60 p-4 rounded-xl border border-white/80 text-left">
+                        {hero.desc}
+                      </p>
+
+                      <div className="bg-white/70 rounded-2xl p-3 border border-white/80 max-w-sm mx-auto">
+                        <h5 className="font-black text-[11px] text-slate-500 mb-1 flex items-center justify-center gap-1"><TrendingUp className="w-3.5 h-3.5" /> 五把鑰匙面板</h5>
+                        <ResponsiveContainer width="100%" height={240}>
+                          <RadarChart data={statData}>
+                            <PolarGrid stroke="#E5D5C0" />
+                            <PolarAngleAxis dataKey="stat" tick={{ fontSize: 10.5, fontWeight: 700, fill: '#7D5C43' }} />
+                            <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
+                            <Radar dataKey="value" stroke="#E0812A" fill="#E0812A" fillOpacity={0.45} />
+                          </RadarChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      <div className="bg-white/70 rounded-2xl p-4 border border-white/80 text-left max-w-md mx-auto space-y-2">
+                        <h5 className="font-black text-xs text-slate-700">🎯 推薦優先探索單元：{hero.name === topKey ? topKey : topKey}</h5>
+                        <p className="text-[12px] font-bold text-slate-500 leading-relaxed">{hero.unitDesc}</p>
+                        <div className="border-t border-slate-200 pt-2 flex items-center justify-between">
+                          <span className="text-[11px] font-black text-slate-500">⏳ 生命自覺指數</span>
+                          <span className="text-sm font-black text-[#E65100]">{awareness}%</span>
+                        </div>
+                        <p className="text-[11px] font-bold text-slate-400 leading-relaxed">你選的 24 小時裡，有 {awareness}% 是真正貼近內心、而不只是「必要」的事。</p>
+                      </div>
+
+                      <button
+                        onClick={resetG1}
+                        className="px-6 py-2 border-2 border-white/70 bg-white/50 text-slate-600 font-black text-xs rounded-xl hover:bg-white/80 transition-all cursor-pointer shadow-xs active:scale-98"
+                      >
+                        重新分配我的 24 小時
+                      </button>
+                    </motion.div>
+                  );
+                })()}
               </div>
             )}
 

@@ -47,7 +47,7 @@ export default function LearningStatisticsTab({ submissions }: LearningStatistic
   const totalStudentsCount = submissions.length || 1;
 
   const GAME_LABELS: Array<{ key: string; label: string; emoji: string }> = [
-    { key: 'mbti', label: 'MBTI', emoji: '🧠' },
+    { key: 'mbti', label: '生命讀秒', emoji: '⏳' },
     { key: 'puzzle', label: '拼圖地圖', emoji: '🧩' },
     { key: 'adventure', label: '情境冒險', emoji: '🧭' },
     { key: 'relationships', label: '人際連連看', emoji: '🕸️' },
@@ -61,7 +61,7 @@ export default function LearningStatisticsTab({ submissions }: LearningStatistic
 
   const summarizeGameData = (key: string, data: any): string => {
     switch (key) {
-      case 'mbti': return `性格類型：${data?.type || '—'}`;
+      case 'mbti': return `最重視：${data?.topKeyLabel || '—'}｜生命自覺指數 ${data?.awarenessIndex ?? '—'}%`;
       case 'puzzle': return `已拼入 ${Object.values(data?.placed || {}).filter(Boolean).length}/5 個主題`;
       case 'adventure': return `同理${data?.points?.同理 ?? 0} · 責任${data?.points?.責任 ?? 0} · 勇氣${data?.points?.勇氣 ?? 0}`;
       case 'relationships': return `建立了 ${data?.connections?.length ?? 0} 條關係連結`;
